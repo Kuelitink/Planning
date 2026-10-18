@@ -40,7 +40,7 @@ import type { CalendarEvent, ID, Priority, Project, Settings, Task, TimeWindow }
 import { expandEvents } from './events';
 import { clip, normalize, subtract, type Interval } from './intervals';
 import { addDays, DAY, MINUTE, parseDateTime, parseISODate, isDateOnly, roundUpToGrid, startOfDay } from './time';
-import { rulesForTask, windowIntervals } from './windows';
+import { rulesForTask, windowAvailability } from './windows';
 
 export const PRIORITY_HORIZON_DAYS: Record<Priority, number> = { 1: 1, 2: 3, 3: 7, 4: 14 };
 
@@ -169,9 +169,9 @@ export function schedule(input: ScheduleInput): ScheduleResult {
   // --- Placement -------------------------------------------------------------
   const windowCache = new Map<string, Interval[]>();
   const availability = (t: Task): Interval[] => {
-    const { windowId, rules } = rulesForTask(t, windows, projects, settings);
+    const { windowId, rules, window } = rulesForTask(t, windows, projects, settings);
     const key = windowId ?? '__default__';
-    if (!windowCache.has(key)) windowCache.set(key, windowIntervals(rules, nowMs, horizonEnd));
+    if (!windowCache.has(key)) windowCache.set(key, windowAvailability(window, rules, nowMs, horizonEnd));
     return windowCache.get(key)!;
   };
 

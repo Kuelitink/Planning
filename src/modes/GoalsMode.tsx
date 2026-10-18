@@ -1,15 +1,20 @@
-/** Mode Objectifs : objectifs du jour, de la semaine ou du mois, avec accès direct au chrono. */
+/**
+ * Mode Objectifs : la checklist des tâches choisies pour le jour, la semaine ou le
+ * mois. On y ajoute les tâches qu'on veut faire, parmi les plus urgentes ou par
+ * recherche ; elles sont alors planifiées en priorité dans la période.
+ */
 
-import { useState, type CSSProperties } from 'react';
-import type { Goal, GoalPeriod, ID } from '../core/types';
-import { goalProgress, goalTasks, periodEnd, periodStartFor } from '../core/goals';
+import { useState } from 'react';
+import type { GoalPeriod, Task } from '../core/types';
+import { periodEnd, periodStartFor } from '../core/goals';
 import { addDays, parseISODate } from '../core/time';
 import { useStore } from '../state/store';
 import { useNav } from '../state/nav';
-import { Dot, Header, PlayButton } from '../ui/kit';
-import { IconCheck, IconChevronDown, IconChevronLeft, IconChevronRight, IconPlus } from '../ui/icons';
+import { pickedTaskIds } from '../state/urgency';
+import { Dot, Fab, Header, PlayButton, PriorityCheck } from '../ui/kit';
+import { IconChevronLeft, IconChevronRight, IconX } from '../ui/icons';
 import { formatDayMonth, formatMonth, formatRelativeDay, isoWeek } from '../ui/format';
-import { toneOf } from '../ui/palette';
+import { LIST_STYLE } from './TaskRow';
 
 const PERIOD_KEY = 'planning.goalsPeriod';
 
@@ -26,7 +31,7 @@ function readPeriod(): GoalPeriod {
   } catch {
     /* stockage indisponible */
   }
-  return 'week';
+  return 'day';
 }
 
 function writePeriod(p: GoalPeriod) {
@@ -98,226 +103,93 @@ export function PeriodPicker({ value, onChange }: { value: GoalPeriod; onChange:
   );
 }
 
-export function ProgressBar({ ratio, complete, max, now }: { ratio: number; complete: boolean; max: number; now: number }) {
-  return (
-    <div
-      role="progressbar"
-      aria-label="Progression"
-      aria-valuemin={0}
-      aria-valuemax={max}
-      aria-valuenow={now}
-      style={{ height: 6, borderRadius: 999, background: 'var(--soft)', overflow: 'hidden' }}
-    >
-      <div
-        style={{
-          width: `${Math.round(Math.min(1, Math.max(0, ratio)) * 100)}%`,
-          height: '100%',
-          borderRadius: 999,
-          background: complete ? '#1F9E6B' : 'var(--ink)',
-        }}
-      />
-    </div>
-  );
-}
+/** Ligne d'objectif : case (priorité), titre (fiche), liste, chrono, retirer. */
+function GoalRow({ task, onRemove }: { task: Task; onRemove: () => void }) {
+  const { projects, setTaskDone } = useStore();
+  const { openSheet, showToast } = useNav();
+  const project = task.projectId ? projects.find((p) => p.id === task.projectId) : undefined;
+  const done = task.status === 'done';
 
-const linkStyle: CSSProperties = {
-  minHeight: 44,
-  padding: '0 4px',
-  border: 'none',
-  background: 'transparent',
-  color: 'var(--muted)',
-  fontSize: 14,
-  fontWeight: 500,
-  textDecoration: 'underline',
-  textUnderlineOffset: 3,
-};
-
-const stepStyle: CSSProperties = {
-  width: 44,
-  height: 44,
-  border: '1px solid var(--line)',
-  borderRadius: 999,
-  background: 'var(--card)',
-  fontSize: 20,
-  fontWeight: 600,
-};
-
-function GoalCard({ goal, expanded, onToggle }: { goal: Goal; expanded: boolean; onToggle: () => void }) {
-  const { tasks, projects, saveGoal } = useStore();
-  const { openSheet } = useNav();
-  const progress = goalProgress(goal, tasks);
-  const linked = goalTasks(goal, tasks);
-  const colorOf = (projectId?: ID) => toneOf(projects.find((p) => p.id === projectId)?.color).dot;
-  const hasTarget = goal.target !== undefined && goal.target > 0;
-  const bodyId = `goal-${goal.id}`;
-
-  const setProgress = (value: number) => {
-    const target = goal.target ?? 0;
-    saveGoal({ ...goal, progress: Math.max(0, Math.min(target, value)) });
+  const toggle = (checked: boolean) => {
+    setTaskDone(task.id, checked);
+    if (checked) showToast({ message: 'Tâche terminée', action: { label: 'Annuler', run: () => setTaskDone(task.id, false) } });
   };
 
   return (
-    <div className="card" style={{ padding: expanded ? '14px 18px 8px' : '14px 18px 18px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <li className="row" style={{ gap: 12, paddingRight: 8 }}>
+      <PriorityCheck
+        priority={task.priority}
+        checked={done}
+        onChange={toggle}
+        label={done ? `Remettre « ${task.title} » à faire` : `Terminer « ${task.title} »`}
+      />
       <button
         type="button"
-        aria-expanded={expanded}
-        aria-controls={bodyId}
-        onClick={onToggle}
-        style={{
-          minHeight: 44,
-          margin: '0 -8px 0 0',
-          padding: 0,
-          border: 'none',
-          background: 'transparent',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 10,
-          textAlign: 'left',
-        }}
+        className={done ? 'row__title row__title--done' : 'row__title'}
+        onClick={() => openSheet({ kind: 'task', id: task.id })}
       >
-        <span
-          style={{
-            flex: 1,
-            minWidth: 0,
-            fontSize: 17,
-            fontWeight: 600,
-            color: progress.complete ? 'var(--muted)' : 'var(--ink)',
-          }}
-        >
-          {goal.title}
-        </span>
-        {progress.complete && (
-          <span style={{ color: '#1F9E6B', display: 'inline-flex' }} aria-label="Atteint">
-            <IconCheck size={18} />
-          </span>
-        )}
-        <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--muted)' }}>
-          {progress.done}/{progress.total}
-        </span>
-        <span
-          aria-hidden="true"
-          style={{
-            width: 36,
-            height: 36,
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'var(--muted)',
-            transform: expanded ? 'rotate(180deg)' : undefined,
-          }}
-        >
-          <IconChevronDown size={20} />
-        </span>
+        {task.title}
       </button>
-
-      <ProgressBar ratio={progress.ratio} complete={progress.complete} max={progress.total} now={progress.done} />
-
-      {expanded && (
-        <div id={bodyId} style={{ display: 'flex', flexDirection: 'column' }}>
-          {hasTarget && (
-            <div style={{ minHeight: 60, display: 'flex', alignItems: 'center', gap: 12, borderTop: '1px solid var(--line)' }}>
-              <span style={{ flex: 1, fontSize: 15, color: 'var(--muted)' }}>Fait</span>
-              <button type="button" style={stepStyle} aria-label="Retirer 1" onClick={() => setProgress(progress.done - 1)}>
-                −
-              </button>
-              <span style={{ minWidth: 48, textAlign: 'center', fontSize: 16, fontWeight: 600 }}>
-                {progress.done} / {goal.target}
-              </span>
-              <button type="button" style={stepStyle} aria-label="Ajouter 1" onClick={() => setProgress(progress.done + 1)}>
-                +
-              </button>
-            </div>
-          )}
-
-          {linked.map((t) => (
-            <div key={t.id} style={{ minHeight: 56, display: 'flex', alignItems: 'center', gap: 12, borderTop: '1px solid var(--line)' }}>
-              <Dot color={colorOf(t.projectId)} />
-              <span
-                style={{
-                  flex: 1,
-                  minWidth: 0,
-                  fontSize: 15,
-                  fontWeight: 500,
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                  color: t.status === 'done' ? 'var(--faint)' : 'var(--ink)',
-                  textDecoration: t.status === 'done' ? 'line-through' : undefined,
-                }}
-              >
-                {t.title}
-              </span>
-              {t.status === 'todo' ? (
-                <PlayButton taskId={t.id} title={t.title} />
-              ) : (
-                <span style={{ width: 40, display: 'inline-flex', justifyContent: 'center', color: '#1F9E6B' }} aria-label="Faite">
-                  <IconCheck size={18} />
-                </span>
-              )}
-            </div>
-          ))}
-
-          {!linked.length && !hasTarget && (
-            <p style={{ margin: 0, padding: '14px 0', borderTop: '1px solid var(--line)', fontSize: 14, color: 'var(--muted)' }}>
-              Aucune tâche liée.
-            </p>
-          )}
-
-          <div style={{ display: 'flex', gap: 12, borderTop: '1px solid var(--line)', paddingTop: 2 }}>
-            <button type="button" style={linkStyle} onClick={() => openSheet({ kind: 'goal', id: goal.id })}>
-              Lier des tâches
-            </button>
-            <button type="button" style={linkStyle} onClick={() => openSheet({ kind: 'goal', id: goal.id })}>
-              Modifier
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
+      {project && <Dot color={project.color} />}
+      {!done && <PlayButton taskId={task.id} title={task.title} />}
+      <button
+        type="button"
+        className="icon-btn"
+        style={{ width: 36, height: 36, color: 'var(--faint)' }}
+        aria-label={`Retirer « ${task.title} » des objectifs`}
+        onClick={onRemove}
+      >
+        <IconX size={18} />
+      </button>
+    </li>
   );
 }
 
+const EMPTY_TEXT: Record<GoalPeriod, string> = {
+  day: "Choisis ce que tu veux faire aujourd'hui.",
+  week: 'Choisis ce que tu veux faire cette semaine.',
+  month: 'Choisis ce que tu veux faire ce mois-ci.',
+};
+
 export function GoalsMode() {
-  const { goals, settings } = useStore();
-  const { openSheet } = useNav();
+  const { goals, tasks, settings, pickTask, unpickTask } = useStore();
+  const { openSheet, showToast } = useNav();
   const [period, setPeriodState] = useState<GoalPeriod>(readPeriod);
   const [anchor, setAnchor] = useState(() => new Date());
-  /** `undefined` = premier objectif déplié par défaut ; `null` = tout replié. */
-  const [expanded, setExpanded] = useState<ID | null | undefined>(undefined);
 
   const now = new Date();
   const periodStart = periodStartFor(period, anchor, settings.weekStartsOn);
   const isCurrent = periodStart === periodStartFor(period, now, settings.weekStartsOn);
-  const list = goals
-    .filter((g) => g.period === period && g.periodStart === periodStart)
-    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-  const openId = expanded === undefined ? list[0]?.id : expanded;
+  const byId = new Map(tasks.map((t) => [t.id, t]));
+  const picked = pickedTaskIds(goals, period, periodStart)
+    .map((id) => byId.get(id))
+    .filter((t): t is Task => Boolean(t));
+  const todo = picked.filter((t) => t.status === 'todo');
+  const done = picked.filter((t) => t.status === 'done');
 
   const setPeriod = (p: GoalPeriod) => {
     setPeriodState(p);
     writePeriod(p);
-    setExpanded(undefined);
   };
-  const move = (n: number) => {
-    setAnchor((d) => shift(d, period, n));
-    setExpanded(undefined);
+  const openPicker = () => openSheet({ kind: 'goalPick', period, periodStart });
+  const remove = (task: Task) => {
+    unpickTask(task.id, period, periodStart);
+    showToast({ message: 'Retirée des objectifs', action: { label: 'Annuler', run: () => pickTask(task.id, period, periodStart) } });
   };
+  const emptyText = period === 'day' && !isCurrent ? 'Choisis ce que tu veux faire ce jour-là.' : EMPTY_TEXT[period];
 
   return (
     <>
       <Header />
       <PeriodPicker value={period} onChange={setPeriod} />
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '12px 0 12px' }}>
-        <button type="button" className="icon-btn" aria-label="Période précédente" onClick={() => move(-1)}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '12px 0 8px' }}>
+        <button type="button" className="icon-btn" aria-label="Période précédente" onClick={() => setAnchor((d) => shift(d, period, -1))}>
           <IconChevronLeft />
         </button>
         <button
           type="button"
-          onClick={() => {
-            setAnchor(new Date());
-            setExpanded(undefined);
-          }}
+          onClick={() => setAnchor(new Date())}
           disabled={isCurrent}
           aria-label={isCurrent ? undefined : 'Revenir à la période en cours'}
           style={{
@@ -333,36 +205,32 @@ export function GoalsMode() {
         >
           {periodLabel(period, periodStart, now)}
         </button>
-        <button type="button" className="icon-btn" aria-label="Période suivante" onClick={() => move(1)}>
+        <button type="button" className="icon-btn" aria-label="Période suivante" onClick={() => setAnchor((d) => shift(d, period, 1))}>
           <IconChevronRight />
         </button>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {list.map((g) => (
-          <GoalCard key={g.id} goal={g} expanded={g.id === openId} onToggle={() => setExpanded(g.id === openId ? null : g.id)} />
-        ))}
-        {!list.length && <p className="empty">Aucun objectif pour cette période.</p>}
-        <button
-          type="button"
-          onClick={() => openSheet({ kind: 'goal', period, periodStart })}
-          style={{
-            alignSelf: 'flex-start',
-            height: 48,
-            padding: '0 8px',
-            border: 'none',
-            background: 'transparent',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            fontSize: 16,
-            fontWeight: 600,
-          }}
-        >
-          <IconPlus />
-          <span>Objectif</span>
-        </button>
-      </div>
+      {picked.length > 0 ? (
+        <>
+          <p className="subtitle" style={{ margin: '0 0 12px 4px' }}>
+            {done.length} sur {picked.length} faite{done.length > 1 ? 's' : ''}
+          </p>
+          <ul className="stack" style={LIST_STYLE}>
+            {[...todo, ...done].map((t) => (
+              <GoalRow key={t.id} task={t} onRemove={() => remove(t)} />
+            ))}
+          </ul>
+        </>
+      ) : (
+        <div className="empty" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
+          <span>{emptyText}</span>
+          <button type="button" className="btn btn--primary" onClick={openPicker}>
+            Ajouter des tâches
+          </button>
+        </div>
+      )}
+
+      <Fab label="Ajouter des objectifs" onClick={openPicker} />
     </>
   );
 }

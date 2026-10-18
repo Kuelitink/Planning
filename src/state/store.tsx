@@ -7,15 +7,16 @@
  */
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import type { CalendarEvent, Entity, Goal, ID, Project, Settings, Task, TimeEntry, TimeWindow } from '../core/types';
+import type { CalendarEvent, Entity, Goal, GoalPeriod, ID, ISODate, Project, Settings, Task, TimeEntry, TimeWindow } from '../core/types';
 import { DEFAULT_SETTINGS } from '../core/types';
 import { createEntity, createTask, touch, type NewTask } from '../core/entity';
-import { schedule, type ScheduleResult } from '../core/scheduler';
+import { parseDeadline, schedule, type ScheduleResult } from '../core/scheduler';
 import { activeEntry, entryDuration, startTimer as startEntry, stopTimer as stopEntry } from '../core/timer';
 import { MINUTE, parseDateTime, roundUpToGrid } from '../core/time';
 import type { CollectionName, ExportData, Repository } from '../storage/repository';
 import { IndexedDBRepository } from '../storage/indexeddb';
 import { initialSeed, sampleData } from './defaults';
+import { goalDeadlines, goalsOf } from './urgency';
 
 export interface AppData {
   projects: Project[];
@@ -53,9 +54,10 @@ export interface Store extends AppData {
   saveEvent(event: CalendarEvent): void;
   deleteEvent(id: ID): void;
 
-  addGoal(fields: Fields<Goal>): Goal;
-  saveGoal(goal: Goal): void;
-  deleteGoal(id: ID): void;
+  /** Ajoute une tâche aux objectifs de la période (début de période donné). */
+  pickTask(taskId: ID, period: GoalPeriod, periodStart: ISODate): void;
+  /** Retire une tâche des objectifs de la période. */
+  unpickTask(taskId: ID, period: GoalPeriod, periodStart: ISODate): void;
 
   /** Session de chrono en cours. */
   active?: TimeEntry;
@@ -97,7 +99,8 @@ function upsert<T extends Entity>(list: T[], item: T): T[] {
 
 /**
  * Tâches telles que le moteur doit les voir : durée restante après le temps déjà
- * chronométré, et la tâche en cours de chrono fixée sur sa session.
+ * chronométré, la tâche en cours de chrono fixée sur sa session, et une tâche
+ * choisie comme objectif due au plus tard à la fin de sa période (jour, semaine, mois).
  */
 export function tasksForScheduling(data: AppData, now: Date): Task[] {
   const grid = Math.max(1, data.settings.granularityMin);
@@ -107,18 +110,45 @@ export function tasksForScheduling(data: AppData, now: Date): Task[] {
     if (!e.taskId || e === running) continue;
     spent.set(e.taskId, (spent.get(e.taskId) ?? 0) + entryDuration(e, now));
   }
+  const goalEnds = goalDeadlines(data.goals, now, data.settings.weekStartsOn);
   return data.tasks.map((t) => {
     if (t.status !== 'todo') return t;
+    let task = t;
+    const goalEnd = goalEnds.get(t.id);
+    if (goalEnd !== undefined && (!t.deadline || goalEnd < parseDeadline(t.deadline).getTime())) {
+      task = { ...task, deadline: new Date(goalEnd).toISOString() };
+    }
     const spentMin = Math.floor((spent.get(t.id) ?? 0) / MINUTE);
     const remaining = Math.max(grid, t.durationMin - spentMin);
     if (running && running.taskId === t.id && !t.pinned) {
       const start = parseDateTime(running.start);
       const minEnd = roundUpToGrid(now.getTime() + MINUTE, grid);
       const end = Math.max(start.getTime() + remaining * MINUTE, minEnd);
-      return { ...t, pinned: { start: start.toISOString(), end: new Date(end).toISOString() } };
+      return { ...task, pinned: { start: start.toISOString(), end: new Date(end).toISOString() } };
     }
-    return remaining === t.durationMin ? t : { ...t, durationMin: remaining };
+    return remaining === t.durationMin ? task : { ...task, durationMin: remaining };
   });
+}
+
+/**
+ * Plan du moteur pour `now`. « En retard » ne garde que les tâches qui dépassent leur
+ * échéance réelle : un objectif qui ne tient pas dans sa période n'est pas un retard.
+ */
+export function computePlan(data: AppData, now: Date): ScheduleResult {
+  const result = schedule({
+    tasks: tasksForScheduling(data, now),
+    events: data.events,
+    windows: data.windows,
+    projects: data.projects,
+    settings: data.settings,
+    now,
+  });
+  const byId = new Map(data.tasks.map((t) => [t.id, t]));
+  const atRisk = result.atRisk.filter((r) => {
+    const deadline = byId.get(r.taskId)?.deadline;
+    return deadline !== undefined && r.end.getTime() > parseDeadline(deadline).getTime();
+  });
+  return atRisk.length === result.atRisk.length ? result : { ...result, atRisk };
 }
 
 export function StoreProvider({ children, repository }: { children: ReactNode; repository?: Repository }) {
@@ -182,18 +212,10 @@ export function StoreProvider({ children, repository }: { children: ReactNode; r
   const { plan, planAt } = useMemo(() => {
     const now = new Date();
     if (!ready) return { plan: EMPTY_PLAN, planAt: now };
-    const result = schedule({
-      tasks: tasksForScheduling(data, now),
-      events: data.events,
-      windows: data.windows,
-      projects: data.projects,
-      settings: data.settings,
-      now,
-    });
-    return { plan: result, planAt: now };
+    return { plan: computePlan(data, now), planAt: now };
     // `planTick` force un nouveau calcul avec l'heure actuelle.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, data.tasks, data.events, data.windows, data.projects, data.settings, data.timeEntries, planTick]);
+  }, [ready, data.tasks, data.events, data.windows, data.projects, data.settings, data.timeEntries, data.goals, planTick]);
 
   const replan = useCallback(() => setPlanTick((n) => n + 1), []);
 
@@ -341,22 +363,44 @@ export function StoreProvider({ children, repository }: { children: ReactNode; r
     [unpersist],
   );
 
-  const addGoal = useCallback(
-    (fields: Fields<Goal>) => {
-      const g = createEntity<Goal>(fields);
-      setData((d) => ({ ...d, goals: [...d.goals, g] }));
-      persist('goals', g);
-      return g;
+  /** Applique des objectifs modifiés ou supprimés (référence à jour tout de suite, pour les appels enchaînés). */
+  const applyGoals = useCallback(
+    (changed: Goal[], removed: ID[]) => {
+      const apply = (list: Goal[]) => changed.reduce(upsert, list.filter((g) => !removed.includes(g.id)));
+      dataRef.current = { ...dataRef.current, goals: apply(dataRef.current.goals) };
+      setData((d) => ({ ...d, goals: apply(d.goals) }));
+      changed.forEach((g) => persist('goals', g));
+      removed.forEach((id) => unpersist('goals', id));
     },
-    [persist],
+    [persist, unpersist],
   );
-  const saveGoal = useCallback((g: Goal) => saveIn('goals', g), [saveIn]);
-  const deleteGoal = useCallback(
-    (id: ID) => {
-      setData((d) => ({ ...d, goals: d.goals.filter((g) => g.id !== id) }));
-      unpersist('goals', id);
+
+  const pickTask = useCallback(
+    (taskId: ID, period: GoalPeriod, periodStart: ISODate) => {
+      const own = goalsOf(dataRef.current.goals, period, periodStart);
+      if (own.some((g) => g.taskIds.includes(taskId))) return;
+      const container = own[0];
+      const next = container
+        ? touch(container, { taskIds: [...container.taskIds, taskId] })
+        : createEntity<Goal>({ title: 'Objectifs', period, periodStart, taskIds: [taskId], done: false });
+      applyGoals([next], []);
     },
-    [unpersist],
+    [applyGoals],
+  );
+
+  const unpickTask = useCallback(
+    (taskId: ID, period: GoalPeriod, periodStart: ISODate) => {
+      const changed: Goal[] = [];
+      const removed: ID[] = [];
+      for (const g of goalsOf(dataRef.current.goals, period, periodStart)) {
+        if (!g.taskIds.includes(taskId)) continue;
+        const taskIds = g.taskIds.filter((x) => x !== taskId);
+        if (taskIds.length) changed.push(touch(g, { taskIds }));
+        else removed.push(g.id);
+      }
+      if (changed.length || removed.length) applyGoals(changed, removed);
+    },
+    [applyGoals],
   );
 
   // --- Chrono --------------------------------------------------------------------
@@ -464,9 +508,8 @@ export function StoreProvider({ children, repository }: { children: ReactNode; r
     addEvent,
     saveEvent,
     deleteEvent,
-    addGoal,
-    saveGoal,
-    deleteGoal,
+    pickTask,
+    unpickTask,
     active,
     lastTimedTaskId,
     startTimer,

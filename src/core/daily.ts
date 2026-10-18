@@ -8,7 +8,7 @@ import type { ScheduleResult } from './scheduler';
 import { expandEvents } from './events';
 import { clip, normalize, subtract, totalLength, type Interval } from './intervals';
 import { addDays, MINUTE, parseDateTime, startOfDay, toISODate, isSameDay } from './time';
-import { defaultRules, windowIntervals } from './windows';
+import { defaultRules, defaultWindow, windowAvailability } from './windows';
 
 export type DayItem =
   | {
@@ -106,7 +106,8 @@ export function dayPlan(
 
   const tasksInDay = normalize(clip(taskIntervals, from, to));
   const eventsInDay = normalize(clip(eventIntervals, from, to));
-  const capacity = windowIntervals(defaultRules(options.windows ?? [], settings), from, to);
+  const windows = options.windows ?? [];
+  const capacity = windowAvailability(defaultWindow(windows, settings), defaultRules(windows, settings), from, to);
   const free = subtract(capacity, normalize([...tasksInDay, ...eventsInDay]));
 
   return {

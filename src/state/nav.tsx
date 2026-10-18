@@ -21,7 +21,8 @@ export type SheetState =
   | { kind: 'task'; id?: ID; defaults?: Partial<Task> }
   | { kind: 'event'; id?: ID; date?: Date }
   | { kind: 'project'; id?: ID }
-  | { kind: 'goal'; id?: ID; period?: GoalPeriod; periodStart?: ISODate }
+  /** Choisir les tâches des objectifs d'une période. */
+  | { kind: 'goalPick'; period: GoalPeriod; periodStart: ISODate }
   | { kind: 'window'; id?: ID }
   /** Choix « Tâche ou événement ? » depuis le bouton + du calendrier. */
   | { kind: 'add'; date?: Date };

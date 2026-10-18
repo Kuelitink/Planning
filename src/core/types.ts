@@ -46,6 +46,20 @@ export interface WindowRule {
 export interface TimeWindow extends Entity {
   name: string;
   rules: WindowRule[];
+  /** Périodes spéciales (vacances…) qui remplacent les règles habituelles certains jours. */
+  overrides?: WindowOverride[];
+}
+
+/** Règles d'une fenêtre pendant une période spéciale, prioritaires sur les règles habituelles. */
+export interface WindowOverride {
+  /** Même identifiant pour toutes les fenêtres d'une même période spéciale. */
+  periodId: ID;
+  name: string;
+  /** Premier et dernier jour inclus. */
+  from: ISODate;
+  to: ISODate;
+  /** Plages pendant la période ; vide = aucun créneau (horaires fermés). */
+  rules: WindowRule[];
 }
 
 /** 1 = urgente, 2 = haute, 3 = normale, 4 = basse. */

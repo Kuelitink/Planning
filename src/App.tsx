@@ -11,7 +11,7 @@ import { TaskSheet } from './sheets/TaskSheet';
 import { EventSheet } from './sheets/EventSheet';
 import { AddSheet } from './sheets/AddSheet';
 import { ProjectSheet } from './sheets/ProjectSheet';
-import { GoalSheet } from './sheets/GoalSheet';
+import { GoalPickSheet } from './sheets/GoalPickSheet';
 import { WindowSheet } from './sheets/WindowSheet';
 
 function CurrentMode() {
@@ -44,8 +44,8 @@ function CurrentSheet() {
       return <AddSheet date={sheet.date} onClose={closeSheet} />;
     case 'project':
       return <ProjectSheet key={sheet.id ?? 'new'} id={sheet.id} onClose={closeSheet} />;
-    case 'goal':
-      return <GoalSheet key={sheet.id ?? 'new'} id={sheet.id} period={sheet.period} periodStart={sheet.periodStart} onClose={closeSheet} />;
+    case 'goalPick':
+      return <GoalPickSheet period={sheet.period} periodStart={sheet.periodStart} onClose={closeSheet} />;
     case 'window':
       return <WindowSheet key={sheet.id ?? 'new'} id={sheet.id} onClose={closeSheet} />;
   }

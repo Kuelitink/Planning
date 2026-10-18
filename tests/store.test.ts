@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { createEntity } from '../src/core/entity';
-import type { TimeEntry } from '../src/core/types';
+import type { Goal, TimeEntry } from '../src/core/types';
 import { schedule } from '../src/core/scheduler';
-import { tasksForScheduling, type AppData } from '../src/state/store';
+import { computePlan, tasksForScheduling, type AppData } from '../src/state/store';
 import { at, blocksOf, settings, task } from './helpers';
 
 const entry = (id: string, taskId: string, start: string, end?: string): TimeEntry =>
@@ -61,5 +61,46 @@ describe('tâches vues par le planificateur', () => {
     });
     const pinned = tasksForScheduling(d, now)[0].pinned!;
     expect(new Date(pinned.end).getTime()).toBeGreaterThan(now.getTime());
+  });
+});
+
+const goal = (id: string, period: Goal['period'], periodStart: string, taskIds: string[]): Goal =>
+  createEntity<Goal>({ title: 'Objectifs', period, periodStart, taskIds, done: false }, new Date('2026-10-01T00:00:00'), id);
+
+describe('objectifs et planification', () => {
+  it("un objectif du jour P4 passe avant une P2 sans échéance", () => {
+    const d = data({
+      tasks: [task('Mails', { priority: 2, durationMin: 30 }), task('Photos', { priority: 4, durationMin: 60 })],
+      goals: [goal('jour', 'day', '2026-10-19', ['Photos'])],
+    });
+    const plan = computePlan(d, at('2026-10-19 08:00'));
+    expect(blocksOf(plan, 'Photos')).toEqual([['10-19 08:00', '10-19 09:00']]);
+    expect(blocksOf(plan, 'Mails')).toEqual([['10-19 09:00', '10-19 09:30']]);
+  });
+
+  it("une échéance réelle plus proche que la fin de la période reste respectée", () => {
+    const d = data({
+      tasks: [
+        task('Objectif du jour', { priority: 1, durationMin: 60 }),
+        task('Dans 2 h', { priority: 4, durationMin: 30, deadline: at('2026-10-19 10:00').toISOString() }),
+      ],
+      goals: [goal('jour', 'day', '2026-10-19', ['Objectif du jour']), goal('semaine', 'week', '2026-10-19', ['Dans 2 h'])],
+    });
+    const plan = computePlan(d, at('2026-10-19 08:00'));
+    expect(blocksOf(plan, 'Dans 2 h')).toEqual([['10-19 08:00', '10-19 08:30']]);
+    expect(tasksForScheduling(d, at('2026-10-19 08:00')).find((t) => t.id === 'Dans 2 h')!.deadline).toBe(
+      at('2026-10-19 10:00').toISOString(),
+    );
+  });
+
+  it("un objectif qui ne tient pas dans la journée n'est pas « en retard »", () => {
+    const d = data({
+      tasks: [task('Objectif', { durationMin: 60 }), task('Vraie échéance', { durationMin: 60, deadline: '2026-10-19' })],
+      goals: [goal('jour', 'day', '2026-10-19', ['Objectif'])],
+    });
+    // 21:00 : plus de créneau aujourd'hui (horaires par défaut 08:00–20:00).
+    const plan = computePlan(d, at('2026-10-19 21:00'));
+    expect(blocksOf(plan, 'Objectif')[0][0]).toBe('10-20 08:00');
+    expect(plan.atRisk.map((r) => r.taskId)).toEqual(['Vraie échéance']);
   });
 });

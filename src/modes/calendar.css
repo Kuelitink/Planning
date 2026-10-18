@@ -1,4 +1,4 @@
-/* Mode Calendrier : timeline du jour. */
+/* Mode Calendrier : vues Jour, Semaine, Mois. */
 
 .cal-nav {
   display: flex;
@@ -157,6 +157,306 @@
   height: 10px;
   border-radius: 50%;
   background: var(--accent);
+}
+
+/* Barre sous l'en-tête : choix de la vue + période précédente / suivante. */
+.cal-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: -8px 0 16px;
+}
+
+.cal-swipe {
+  touch-action: pan-y;
+}
+
+/* --- Vue Semaine ---------------------------------------------------------- */
+
+.week {
+  --week-gutter: 30px;
+}
+
+.week__head,
+.week__allday {
+  display: grid;
+  grid-template-columns: var(--week-gutter) repeat(7, minmax(0, 1fr));
+}
+
+.week__head {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  padding: 4px 0 6px;
+  background: var(--bg);
+}
+
+.week__day {
+  min-height: 52px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+
+.week__dow {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.week__num {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.week__num--today {
+  background: var(--ink);
+  color: #fff;
+}
+
+.week__allday {
+  margin-bottom: 4px;
+}
+
+.week__allday-col {
+  min-width: 0;
+  padding: 0 1px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.week__allday-item {
+  height: 20px;
+  padding: 0 3px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--card);
+  color: #3a404c;
+  font-size: 10px;
+  font-weight: 600;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.week__body {
+  position: relative;
+  margin-top: 8px;
+}
+
+.week__hour {
+  position: absolute;
+  left: 0;
+  width: calc(var(--week-gutter) - 6px);
+  text-align: right;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--muted);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.week__line {
+  position: absolute;
+  left: var(--week-gutter);
+  right: 0;
+  height: 1px;
+  background: var(--line);
+  pointer-events: none;
+}
+
+.week__cols {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--week-gutter);
+  right: 0;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.week__col {
+  position: relative;
+  border-left: 1px solid var(--line);
+  cursor: pointer;
+}
+
+.week__block {
+  position: absolute;
+  z-index: 1;
+  overflow: hidden;
+  padding: 3px 4px;
+  border: none;
+  border-radius: 8px;
+  text-align: left;
+  display: block;
+}
+
+.week__block--event {
+  background: var(--card);
+  border: 1px solid var(--line);
+  color: #3a404c;
+}
+
+.week__block--running {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.week__title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 11px;
+  line-height: 13px;
+  font-weight: 600;
+  overflow-wrap: break-word;
+  hyphens: auto;
+}
+
+.week__now {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 3;
+  height: 2px;
+  background: var(--accent);
+  pointer-events: none;
+  scroll-margin: 40vh 0;
+}
+
+/* --- Vue Mois -------------------------------------------------------------- */
+
+.month__dows,
+.month__grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.month__dows {
+  margin-bottom: 6px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.month__grid {
+  gap: 4px;
+}
+
+.month__cell {
+  min-width: 0;
+  height: 56px;
+  padding: 5px 0 0;
+  border: 2px solid transparent;
+  border-radius: 14px;
+  background: var(--card);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.month__cell--outside {
+  background: transparent;
+  color: var(--faint);
+}
+
+.month__cell--selected {
+  border-color: var(--ink);
+}
+
+.month__num {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.month__num--today {
+  background: var(--ink);
+  color: #fff;
+}
+
+.month__dots {
+  height: 10px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.month__dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.month__more {
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--muted);
+}
+
+/* Agenda du jour choisi, sous la grille du mois. */
+.cal-agenda {
+  margin-top: 24px;
+}
+
+.cal-agenda__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.cal-agenda__title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.cal-agenda__empty {
+  margin: 8px 4px;
+  font-size: 15px;
+  color: var(--muted);
+}
+
+.cal-agenda__row {
+  width: 100%;
+  border: none;
+  text-align: left;
+}
+
+.cal-agenda__time {
+  width: 52px;
+  flex: none;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.cal-agenda__icon {
+  flex: none;
+  display: inline-flex;
+  color: var(--faint);
 }
 
 /* Feuille « Ajouter ». */

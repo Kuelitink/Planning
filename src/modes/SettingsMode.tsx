@@ -1,13 +1,14 @@
 /** Réglages : modes affichés, horaires, planification, sauvegarde des données. */
 
-import { useId, useRef, type ReactNode } from 'react';
+import { useId, useRef, useState, type ReactNode } from 'react';
 import { toISODate } from '../core/time';
 import { parseExport } from '../storage/repository';
 import { useStore } from '../state/store';
 import { MODE_LABEL, MODES, useNav, type Mode } from '../state/nav';
 import { Field, Header, MODE_ICON } from '../ui/kit';
 import { IconChevronRight, IconPlus } from '../ui/icons';
-import { summarizeRules } from '../sheets/WindowSheet';
+import { summarizeRules } from '../sheets/RangesEditor';
+import { formatPeriodDates, PeriodSheet, summarizePeriod, upcomingPeriods } from '../sheets/PeriodSheet';
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -65,6 +66,8 @@ export function SettingsMode() {
   const { visibleModes, setVisibleModes, openSheet, showToast } = useNav();
   const fileRef = useRef<HTMLInputElement>(null);
   const ids = { def: useId(), buffer: useId(), horizon: useId() };
+  /** Période spéciale ouverte : `{}` = nouvelle, `{ id }` = édition. */
+  const [period, setPeriod] = useState<{ id?: string } | null>(null);
 
   const toggleMode = (m: Mode, on: boolean) => {
     const next = on ? [...visibleModes, m] : visibleModes.filter((x) => x !== m);
@@ -72,6 +75,7 @@ export function SettingsMode() {
   };
 
   const sortedWindows = [...windows].sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+  const periods = upcomingPeriods(windows);
 
   const doExport = async () => {
     try {
@@ -138,6 +142,31 @@ export function SettingsMode() {
         <button type="button" style={{ ...rowButton, fontSize: 16, fontWeight: 600 }} onClick={() => openSheet({ kind: 'window' })}>
           <IconPlus size={18} />
           <span>Horaires</span>
+        </button>
+        <h3 className="section-label" style={{ margin: '16px 0 0' }}>
+          Périodes spéciales
+        </h3>
+        {periods.map((p) => (
+          <button key={p.periodId} type="button" style={rowButton} onClick={() => setPeriod({ id: p.periodId })}>
+            <span style={{ flex: 1, minWidth: 0 }}>
+              <span style={{ display: 'block', fontSize: 16, fontWeight: 500 }}>
+                {p.name} <span style={{ fontWeight: 400, color: 'var(--muted)' }}>· {formatPeriodDates(p.from, p.to)}</span>
+              </span>
+              <span style={{ display: 'block', fontSize: 13, color: 'var(--muted)', marginTop: 2 }}>{summarizePeriod(p, windows)}</span>
+            </span>
+            <span style={{ color: 'var(--faint)', display: 'inline-flex' }}>
+              <IconChevronRight size={18} />
+            </span>
+          </button>
+        ))}
+        <button
+          type="button"
+          style={{ ...rowButton, fontSize: 16, fontWeight: 600 }}
+          onClick={() => setPeriod({})}
+          disabled={windows.length === 0}
+        >
+          <IconPlus size={18} />
+          <span>Période spéciale</span>
         </button>
         <Field label="Horaires par défaut" htmlFor={ids.def}>
           <select
@@ -216,6 +245,7 @@ export function SettingsMode() {
       </Section>
 
       <p style={{ margin: '32px 0 0', textAlign: 'center', fontSize: 13, color: 'var(--faint)' }}>Planning — v0.2</p>
+      {period && <PeriodSheet key={period.id ?? 'new'} periodId={period.id} onClose={() => setPeriod(null)} />}
     </>
   );
 }

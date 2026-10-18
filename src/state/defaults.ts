@@ -81,12 +81,17 @@ export function sampleData(now = new Date()): Sample {
     e('dejeuner', 'Déjeuner', at(0, 12), at(0, 13), EVERY_DAY),
     e('appel', 'Appel fournisseur', at(0, 15), at(0, 15, 30)),
   ];
-  const week = toISODate(startOfWeek(now, 1));
+  // Objectifs : les tâches choisies pour aujourd'hui et pour la semaine.
   const g = (id: string, fields: Omit<Goal, 'id' | 'createdAt' | 'updatedAt'>) => createEntity<Goal>(fields, now, `ex-${id}`);
   const goals = [
-    g('rapport', { title: 'Envoyer le rapport mensuel', period: 'week', periodStart: week, taskIds: ['ex-rapport', 'ex-relire'], done: false }),
-    g('site', { title: 'Mettre le site en ligne', period: 'week', periodStart: week, taskIds: ['ex-maquette', 'ex-formulaire', 'ex-enligne'], done: false }),
-    g('courir', { title: 'Courir 3 fois', period: 'week', periodStart: week, taskIds: ['ex-course'], target: 3, progress: 1, done: false }),
+    g('jour', { title: 'Objectifs', period: 'day', periodStart: toISODate(today), taskIds: ['ex-rapport', 'ex-mails'], done: false }),
+    g('semaine', {
+      title: 'Objectifs',
+      period: 'week',
+      periodStart: toISODate(startOfWeek(now, 1)),
+      taskIds: ['ex-maquette', 'ex-formulaire', 'ex-enligne', 'ex-course'],
+      done: false,
+    }),
   ];
   return { projects, tasks, events, goals };
 }
