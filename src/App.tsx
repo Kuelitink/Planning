@@ -1,5 +1,6 @@
+import { useEffect } from 'react';
 import { StoreProvider, useStore } from './state/store';
-import { NavProvider, useNav } from './state/nav';
+import { NavProvider, useNav, type Mode } from './state/nav';
 import { ModeMenu, ToastView } from './ui/kit';
 import { CalendarMode } from './modes/CalendarMode';
 import { ChecklistMode } from './modes/ChecklistMode';
@@ -51,8 +52,25 @@ function CurrentSheet() {
   }
 }
 
+/**
+ * DA de la page : « Trait fin » (ui/da-trait-fin.css) sur le Calendrier pour l'instant,
+ * « Blocs couleur » (ui/theme.css) ailleurs.
+ */
+function useDA(mode: Mode) {
+  useEffect(() => {
+    const root = document.documentElement;
+    if (mode === 'calendar') root.dataset.da = 'trait-fin';
+    else delete root.dataset.da;
+    // Barre du navigateur / de l'app installée : même fond que la page.
+    const bg = getComputedStyle(root).getPropertyValue('--bg').trim();
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', bg);
+  }, [mode]);
+}
+
 function Shell() {
   const { ready } = useStore();
+  const { mode } = useNav();
+  useDA(mode);
   if (!ready) return <main className="app" aria-busy="true" />;
   return (
     <>

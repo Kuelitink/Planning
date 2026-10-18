@@ -1,0 +1,217 @@
+/* DA « 1a·1 Trait fin » (Guimauve contour) : fond rose pâle, cartes blanches, fin trait prune
+   autour des éléments, blocs pastel, accent framboise, touche jaune pour aujourd'hui / maintenant.
+   Active quand <html data-da="trait-fin"> ; pour l'instant sur le mode Calendrier (voir App.tsx). */
+
+:root[data-da='trait-fin'] {
+  --bg: #ffeaf1;
+  --card: #ffffff;
+  --line: #f2c6d6;
+  --ink: #3a0f24;
+  --muted: #8a4d66;
+  --faint: #b98aa0;
+  --soft: #ffe0ec;
+  --accent: #c2185b; /* framboise : maintenant, chrono */
+  --danger: #b3123f;
+  --primary: #c2185b;
+  --on-primary: #ffffff;
+  --p1: #d7263d;
+  --p2: #e07a00;
+  --p3: #a5708a;
+  --p4: #d9b3c4;
+  --pop: #ffe14d; /* jaune : aujourd'hui, heure actuelle */
+  --picked: #ffc9dc; /* choix en cours (vue, jour du mois) */
+  --stroke: 1.5px solid var(--ink);
+  --font: 'Nunito', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display: 'Fredoka', 'Nunito', system-ui, sans-serif;
+}
+
+/* --- En-tête, barre de vue, menu ---------------------------------------- */
+
+:root[data-da='trait-fin'] .header .pill {
+  border: var(--stroke);
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 500;
+}
+
+:root[data-da='trait-fin'] .header svg,
+:root[data-da='trait-fin'] .cal-bar svg {
+  stroke-width: 1.8;
+}
+
+:root[data-da='trait-fin'] .cal-nav__date {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 500;
+}
+
+:root[data-da='trait-fin'] .cal-bar .seg {
+  padding: 2px;
+  border: var(--stroke);
+  background: var(--card);
+}
+
+:root[data-da='trait-fin'] .cal-bar .seg button {
+  font-family: var(--font-display);
+  font-weight: 500;
+}
+
+:root[data-da='trait-fin'] .cal-bar .seg button[aria-pressed='true'] {
+  background: var(--picked);
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1.5px var(--ink);
+}
+
+:root[data-da='trait-fin'] .cal-bar .cal-nav {
+  gap: 6px;
+}
+
+:root[data-da='trait-fin'] .cal-bar .icon-btn {
+  width: 40px;
+  height: 40px;
+  border: var(--stroke);
+  background: var(--card);
+}
+
+:root[data-da='trait-fin'] .menu {
+  border: var(--stroke);
+}
+
+:root[data-da='trait-fin'] .fab {
+  width: 58px;
+  height: 58px;
+  border: var(--stroke);
+  border-radius: 50%;
+}
+
+/* --- Vue Jour ------------------------------------------------------------- */
+
+:root[data-da='trait-fin'] .cal-allday button {
+  border: var(--stroke);
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-weight: 500;
+}
+
+:root[data-da='trait-fin'] .cal__hour {
+  font-weight: 700;
+}
+
+:root[data-da='trait-fin'] .cal__block {
+  border: var(--stroke);
+  border-radius: 22px;
+  padding: 10px 15px;
+  color: var(--ink);
+}
+
+:root[data-da='trait-fin'] .cal__block--medium {
+  border-radius: 18px;
+  padding-top: 3px;
+  padding-bottom: 3px;
+}
+
+:root[data-da='trait-fin'] .cal__block--small {
+  border-radius: 14px;
+  padding: 0 12px;
+}
+
+:root[data-da='trait-fin'] .cal__block--event {
+  border-style: dashed;
+  background: var(--card);
+}
+
+:root[data-da='trait-fin'] .cal__title {
+  font-family: var(--font-display);
+  font-weight: 500;
+}
+
+:root[data-da='trait-fin'] .cal__time {
+  font-weight: 700;
+}
+
+:root[data-da='trait-fin'] .cal__risk {
+  color: var(--danger);
+}
+
+/* « Maintenant » : la pastille jaune avec l'heure remplace le point. */
+:root[data-da='trait-fin'] .cal__now::before {
+  display: none;
+}
+
+:root[data-da='trait-fin'] .cal__now-label {
+  display: block;
+  position: absolute;
+  left: -46px;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 3px 5px;
+  border: var(--stroke);
+  border-radius: 999px;
+  background: var(--pop);
+  color: var(--ink);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+/* --- Vue Semaine ---------------------------------------------------------- */
+
+:root[data-da='trait-fin'] .week__num {
+  font-family: var(--font-display);
+  font-weight: 500;
+}
+
+:root[data-da='trait-fin'] .week__num--today,
+:root[data-da='trait-fin'] .month__num--today {
+  border: var(--stroke);
+  background: var(--pop);
+  color: var(--ink);
+}
+
+:root[data-da='trait-fin'] .week__block {
+  border: 1px solid var(--ink);
+  border-radius: 10px;
+  color: var(--ink);
+}
+
+:root[data-da='trait-fin'] .week__block--event {
+  border-style: dashed;
+}
+
+:root[data-da='trait-fin'] .week__title {
+  font-family: var(--font-display);
+  font-weight: 500;
+}
+
+:root[data-da='trait-fin'] .week__allday-item {
+  border: 1px solid var(--ink);
+  color: var(--ink);
+}
+
+/* --- Vue Mois -------------------------------------------------------------- */
+
+:root[data-da='trait-fin'] .month__cell {
+  border: var(--stroke);
+}
+
+:root[data-da='trait-fin'] .month__cell--outside {
+  border-color: transparent;
+}
+
+:root[data-da='trait-fin'] .month__cell--selected {
+  background: var(--picked);
+}
+
+:root[data-da='trait-fin'] .month__num {
+  font-family: var(--font-display);
+  font-weight: 500;
+}
+
+:root[data-da='trait-fin'] .cal-agenda__title {
+  font-family: var(--font-display);
+  font-weight: 600;
+}
+
+:root[data-da='trait-fin'] .cal-agenda__row {
+  border: var(--stroke);
+}

@@ -13,6 +13,8 @@ import { columnStyle, hourLabel, hourRange, isAllDay, isTimed, itemKey, layout, 
 const HOUR_PX = 60;
 /** En dessous de cette hauteur, un bloc tient sur une ligne (titre + heure). */
 const SMALL_PX = 40;
+/** En dessous de cette hauteur, titre et heure sont serrés (ex. 45 min). */
+const MEDIUM_PX = 52;
 
 export function DayView({ day }: { day: Date }) {
   const { plan, tasks, events, windows, settings, projects, active } = useStore();
@@ -79,6 +81,7 @@ export function DayView({ day }: { day: Date }) {
             const top = y(p.from) + 1;
             const h = Math.max(14, y(p.to) - y(p.from) - 2);
             const small = h < SMALL_PX;
+            const size = small ? ' cal__block--small' : h < MEDIUM_PX ? ' cal__block--medium' : '';
             const style: CSSProperties = { top, height: h, ...columnStyle(p) };
             const { item } = p;
             const range = small ? formatHM(item.start) : `${formatHM(item.start)} – ${formatHM(item.end)}`;
@@ -88,7 +91,7 @@ export function DayView({ day }: { day: Date }) {
                 <button
                   key={itemKey(item)}
                   type="button"
-                  className={`cal__block cal__block--event${small ? ' cal__block--small' : ''}`}
+                  className={`cal__block cal__block--event${size}`}
                   style={style}
                   aria-label={`Événement ${item.title}, ${formatHM(item.start)} à ${formatHM(item.end)}`}
                   onClick={() => openSheet({ kind: 'event', id: item.eventId })}
@@ -108,8 +111,8 @@ export function DayView({ day }: { day: Date }) {
               <button
                 key={itemKey(item)}
                 type="button"
-                className={`cal__block${small ? ' cal__block--small' : ''}`}
-                style={{ ...style, background: tone.fill, color: tone.ink }}
+                className={`cal__block${size}`}
+                style={{ ...style, '--tone-fill': tone.fill, '--tone-ink': tone.ink } as CSSProperties}
                 aria-label={`${item.title}, ${formatHM(item.start)} à ${formatHM(item.end)}${running ? ', chrono en cours' : ''}`}
                 onClick={() => openSheet({ kind: 'task', id: item.taskId })}
               >
@@ -136,7 +139,11 @@ export function DayView({ day }: { day: Date }) {
           })}
         </div>
 
-        {isToday && nowMin >= startMin && nowMin <= endMin && <div ref={nowRef} className="cal__now" style={{ top: y(nowMin) - 1 }} aria-hidden="true" />}
+        {isToday && nowMin >= startMin && nowMin <= endMin && (
+          <div ref={nowRef} className="cal__now" style={{ top: y(nowMin) - 1 }} aria-hidden="true">
+            <span className="cal__now-label">{formatHM(now)}</span>
+          </div>
+        )}
       </div>
     </>
   );

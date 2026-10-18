@@ -34,7 +34,7 @@ node scripts/gen-icons.mjs  # régénère les icônes PNG
 - `src/storage/` — interface `Repository` (IndexedDB, mémoire), export/import JSON.
 - `src/state/` — état React : `store.tsx` (données, plan, chrono), `nav.tsx` (modes, feuilles),
   `defaults.ts` (premier lancement, exemple), `urgency.ts` (objectifs, tri par urgence, recherche).
-- `src/ui/` — thème (DA « Blocs couleur »), icônes, composants partagés, formats de dates.
+- `src/ui/` — thèmes (DA « Blocs couleur » dans `theme.css` ; « Trait fin », pour l'instant sur le Calendrier, dans `da-trait-fin.css`), icônes, composants partagés, formats de dates.
 - `src/modes/` — un fichier par mode ; `src/sheets/` — feuilles du bas (tâche, événement…).
 - `tests/` — tests Vitest.
 
