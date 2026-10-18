@@ -283,6 +283,20 @@ describe('schedule — échéances et priorités', () => {
     });
     expect(blocksOf(r, 'Dans 2h')).toEqual([['10-19 08:00', '10-19 08:30']]);
   });
+
+  it('entre deux P1, l’échéance réelle la plus proche passe d’abord', () => {
+    // « Maquette » hérite de P1 via « En ligne » (due vendredi) : même clé que « Rapport »
+    // (P1, dû demain), mais le rapport doit passer avant.
+    const r = run({
+      tasks: [
+        task('Maquette', { priority: 2, durationMin: 90 }),
+        task('En ligne', { priority: 1, durationMin: 30, deadline: '2026-10-23', dependsOn: ['Maquette'] }),
+        task('Rapport', { priority: 1, durationMin: 90, deadline: '2026-10-20' }),
+      ],
+    });
+    expect(blocksOf(r, 'Rapport')).toEqual([['10-19 08:00', '10-19 09:30']]);
+    expect(blocksOf(r, 'Maquette')).toEqual([['10-19 09:30', '10-19 11:00']]);
+  });
 });
 
 describe('schedule — changement d’heure (25 oct. 2026, Paris)', () => {

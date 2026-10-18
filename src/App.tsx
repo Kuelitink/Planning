@@ -1,57 +1,77 @@
-import { useMemo } from 'react';
-import { schedule } from './core/scheduler';
-import { dayPlan } from './core/daily';
-import { DEFAULT_SETTINGS } from './core/types';
-import { formatDuration, formatHM } from './core/time';
-import { sampleEvents, sampleNow, sampleProjects, sampleTasks, sampleWindows } from './sample';
+import { StoreProvider, useStore } from './state/store';
+import { NavProvider, useNav } from './state/nav';
+import { ModeMenu, ToastView } from './ui/kit';
+import { CalendarMode } from './modes/CalendarMode';
+import { ChecklistMode } from './modes/ChecklistMode';
+import { ListsMode } from './modes/ListsMode';
+import { GoalsMode } from './modes/GoalsMode';
+import { ChronoMode } from './modes/ChronoMode';
+import { SettingsMode } from './modes/SettingsMode';
+import { TaskSheet } from './sheets/TaskSheet';
+import { EventSheet } from './sheets/EventSheet';
+import { AddSheet } from './sheets/AddSheet';
+import { ProjectSheet } from './sheets/ProjectSheet';
+import { GoalSheet } from './sheets/GoalSheet';
+import { WindowSheet } from './sheets/WindowSheet';
 
-/** Écran provisoire : l'interface définitive suivra le choix de direction artistique. */
-export function App() {
-  const plan = useMemo(() => {
-    const result = schedule({
-      tasks: sampleTasks,
-      events: sampleEvents,
-      windows: sampleWindows,
-      projects: sampleProjects,
-      settings: DEFAULT_SETTINGS,
-      now: sampleNow,
-    });
-    return dayPlan(result, sampleTasks, sampleEvents, sampleNow, { windows: sampleWindows, settings: DEFAULT_SETTINGS });
-  }, []);
+function CurrentMode() {
+  const { mode } = useNav();
+  switch (mode) {
+    case 'calendar':
+      return <CalendarMode />;
+    case 'checklist':
+      return <ChecklistMode />;
+    case 'lists':
+      return <ListsMode />;
+    case 'goals':
+      return <GoalsMode />;
+    case 'chrono':
+      return <ChronoMode />;
+    case 'settings':
+      return <SettingsMode />;
+  }
+}
 
-  const colorOf = (projectId?: string) => sampleProjects.find((p) => p.id === projectId)?.color ?? '#6B7280';
+function CurrentSheet() {
+  const { sheet, closeSheet } = useNav();
+  if (!sheet) return null;
+  switch (sheet.kind) {
+    case 'task':
+      return <TaskSheet key={sheet.id ?? 'new'} id={sheet.id} defaults={sheet.defaults} onClose={closeSheet} />;
+    case 'event':
+      return <EventSheet key={sheet.id ?? 'new'} id={sheet.id} date={sheet.date} onClose={closeSheet} />;
+    case 'add':
+      return <AddSheet date={sheet.date} onClose={closeSheet} />;
+    case 'project':
+      return <ProjectSheet key={sheet.id ?? 'new'} id={sheet.id} onClose={closeSheet} />;
+    case 'goal':
+      return <GoalSheet key={sheet.id ?? 'new'} id={sheet.id} period={sheet.period} periodStart={sheet.periodStart} onClose={closeSheet} />;
+    case 'window':
+      return <WindowSheet key={sheet.id ?? 'new'} id={sheet.id} onClose={closeSheet} />;
+  }
+}
 
+function Shell() {
+  const { ready } = useStore();
+  if (!ready) return <main className="app" aria-busy="true" />;
   return (
-    <main style={{ fontFamily: 'system-ui, sans-serif', maxWidth: 480, margin: '0 auto', padding: 16, color: '#14161a' }}>
-      <h1 style={{ fontSize: 24, margin: '8px 0 4px' }}>Planning — en construction</h1>
-      <p style={{ margin: '0 0 16px', color: '#5b616e' }}>
-        Exemple d'auto-planification du lundi 19 octobre : {formatDuration(plan.totals.taskMin)} de tâches,{' '}
-        {formatDuration(plan.totals.eventMin)} d'événements, {formatDuration(plan.totals.freeMin)} libres.
-      </p>
-      <ol style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 8 }}>
-        {plan.items.map((item) => (
-          <li
-            key={`${item.kind}-${item.kind === 'task' ? item.taskId : item.eventId}-${item.start.getTime()}`}
-            style={{ display: 'flex', gap: 12, alignItems: 'baseline' }}
-          >
-            <span style={{ fontVariantNumeric: 'tabular-nums', color: '#5b616e', minWidth: 96 }}>
-              {formatHM(item.start)}–{formatHM(item.end)}
-            </span>
-            <span
-              aria-hidden="true"
-              style={{
-                width: 10,
-                height: 10,
-                borderRadius: 999,
-                flex: 'none',
-                background: item.kind === 'task' ? colorOf(item.projectId) : 'transparent',
-                border: item.kind === 'event' ? '1px dashed #9aa1ae' : 'none',
-              }}
-            />
-            <span>{item.title}</span>
-          </li>
-        ))}
-      </ol>
-    </main>
+    <>
+      <main className="app">
+        <CurrentMode />
+      </main>
+      <ModeMenu />
+      <CurrentSheet />
+      <ToastView />
+    </>
+  );
+}
+
+export function App() {
+  return (
+    <StoreProvider>
+      <NavProvider>
+        <Shell />
+      </NavProvider>
+    </StoreProvider>
   );
 }

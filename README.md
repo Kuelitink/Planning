@@ -7,8 +7,11 @@ dépendances, horaires autorisés), listes/projets, objectifs du jour/semaine/mo
 Hébergée gratuitement sur GitHub Pages ; les données restent sur l'appareil (IndexedDB),
 avec export/import JSON pour les sauvegardes.
 
-> État : socle technique et moteur de planification. L'interface arrive après le choix de la
-> direction artistique.
+**En ligne :** https://kuelitink.github.io/Planning/
+
+L'app fonctionne par **modes**, choisis dans le menu en haut à gauche : Calendrier,
+Checklist (to-do du jour auto-planifiée), Listes, Objectifs, Chrono, et Réglages. Les détails
+d'une tâche (priorité, échéance, dépendances, horaires, découpage) sont dans sa fiche.
 
 ## Commandes
 
@@ -29,12 +32,15 @@ node scripts/gen-icons.mjs  # régénère les icônes PNG
   - `daily.ts` to-do du jour et totaux ; `goals.ts` objectifs ; `timer.ts` chrono ;
   - `time.ts`, `intervals.ts`, `windows.ts`, `events.ts` utilitaires (heure locale, récurrences).
 - `src/storage/` — interface `Repository` (IndexedDB, mémoire), export/import JSON.
+- `src/state/` — état React : `store.tsx` (données, plan, chrono), `nav.tsx` (modes, feuilles),
+  `defaults.ts` (premier lancement, exemple).
+- `src/ui/` — thème (DA « Blocs couleur »), icônes, composants partagés, formats de dates.
+- `src/modes/` — un fichier par mode ; `src/sheets/` — feuilles du bas (tâche, événement…).
 - `tests/` — tests Vitest.
 
 ## Déploiement sur GitHub Pages
 
-1. Dans le dépôt GitHub : **Settings › Pages › Source = GitHub Actions**.
-2. Chaque push sur `main` lance `.github/workflows/deploy.yml` (tests, build, mise en ligne).
-   On peut aussi le lancer à la main depuis l'onglet **Actions**.
-3. L'app est servie sur `https://<compte>.github.io/planning/`. Sur le téléphone : ouvrir l'URL,
-   puis « Ajouter à l'écran d'accueil » (Safari : bouton Partager ; Chrome : menu ⋮).
+Chaque push sur `main` lance `.github/workflows/deploy.yml` : tests, build, puis publication de
+`dist/` sur la branche `gh-pages`, servie par GitHub Pages (Settings › Pages › Source : branche
+`gh-pages`). Sur le téléphone : ouvrir l'URL dans Chrome, puis menu ⋮ › « Ajouter à l'écran
+d'accueil » / « Installer l'application ».

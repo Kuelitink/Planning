@@ -20,7 +20,8 @@
  *    priorité, et une échéance lointaine ne compte pas plus que cette échéance
  *    virtuelle : une P1 sans échéance passe avant une P3 due dans un mois, mais
  *    une P4 due dans 2 heures passe avant la P1. À clé égale : priorité, puis
- *    durée la plus courte, puis date de création.
+ *    échéance effective la plus proche, puis durée la plus courte, puis date de
+ *    création.
  *
  *    L'échéance et la priorité « effectives » se propagent vers l'amont des
  *    dépendances : si C (due vendredi, P1) dépend de B, B hérite d'une échéance
@@ -160,6 +161,7 @@ export function schedule(input: ScheduleInput): ScheduleResult {
   const compare = (a: Task, b: Task) =>
     urgencyKey(a) - urgencyKey(b) ||
     effPriority.get(a.id)! - effPriority.get(b.id)! ||
+    effDeadline.get(a.id)! - effDeadline.get(b.id)! ||
     a.durationMin - b.durationMin ||
     a.createdAt.localeCompare(b.createdAt) ||
     a.id.localeCompare(b.id);

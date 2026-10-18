@@ -1,0 +1,196 @@
+/* Mode Calendrier : timeline du jour. */
+
+.cal-nav {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.cal-nav__date {
+  min-height: 44px;
+  padding: 0 4px;
+  border: none;
+  background: transparent;
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.cal-allday {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: -8px 0 16px 48px;
+}
+
+.cal-allday button {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+  color: #3a404c;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.cal {
+  position: relative;
+  margin-top: 8px;
+  touch-action: pan-y;
+}
+
+.cal__hour {
+  position: absolute;
+  left: 0;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--muted);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.cal__line {
+  position: absolute;
+  left: 44px;
+  right: 0;
+  height: 1px;
+  background: var(--line);
+  pointer-events: none;
+}
+
+.cal__grid {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 48px;
+  right: 0;
+  cursor: pointer;
+}
+
+.cal__block {
+  position: absolute;
+  z-index: 1;
+  overflow: hidden;
+  border: none;
+  border-radius: 14px;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 2px;
+  text-align: left;
+}
+
+.cal__block--small {
+  border-radius: 10px;
+  padding: 0 10px;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cal__block--event {
+  background: var(--card);
+  border: 1px solid var(--line);
+  color: #3a404c;
+}
+
+.cal__title {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.cal__title > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cal__block--small .cal__title {
+  font-size: 13px;
+}
+
+.cal__time {
+  flex: none;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.cal__running {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--accent);
+}
+
+.cal__risk {
+  flex: none;
+  display: inline-flex;
+  color: #9e1c0c;
+}
+
+.cal__now {
+  position: absolute;
+  left: 44px;
+  right: 0;
+  z-index: 3;
+  height: 2px;
+  background: var(--accent);
+  pointer-events: none;
+  scroll-margin: 40vh 0;
+}
+
+.cal__now::before {
+  content: '';
+  position: absolute;
+  left: -4px;
+  top: -4px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+/* Feuille « Ajouter ». */
+.add-choices {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.add-choices button {
+  min-height: 96px;
+  border: none;
+  border-radius: 20px;
+  background: var(--soft);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+/* Jours de répétition d'un événement. */
+.day-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.day-chips .chip {
+  width: 36px;
+  padding: 0;
+  justify-content: center;
+}
