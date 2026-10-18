@@ -75,11 +75,21 @@
   border: none;
   border-radius: 14px;
   padding: 8px 12px;
+  background: var(--tone-fill, var(--soft));
+  color: var(--tone-ink, var(--ink));
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
   gap: 2px;
   text-align: left;
+}
+
+/* Bloc à peine plus haut qu'une ligne : titre et heure serrés. */
+.cal__block--medium {
+  padding-top: 3px;
+  padding-bottom: 3px;
+  justify-content: center;
+  gap: 0;
 }
 
 .cal__block--small {
@@ -157,6 +167,11 @@
   height: 10px;
   border-radius: 50%;
   background: var(--accent);
+}
+
+/* Heure actuelle en clair : affichée seulement par la DA « Trait fin ». */
+.cal__now-label {
+  display: none;
 }
 
 /* Barre sous l'en-tête : choix de la vue + période précédente / suivante. */
@@ -301,6 +316,8 @@
   padding: 3px 4px;
   border: none;
   border-radius: 8px;
+  background: var(--tone-fill, var(--soft));
+  color: var(--tone-ink, var(--ink));
   text-align: left;
   display: block;
 }
