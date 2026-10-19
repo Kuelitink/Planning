@@ -3,7 +3,18 @@
 .cal-nav {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 6px;
+}
+
+.cal-nav .icon-btn {
+  width: 40px;
+  height: 40px;
+  border: var(--stroke);
+  background: var(--card);
+}
+
+.cal-nav svg {
+  stroke-width: 1.8;
 }
 
 .cal-nav__date {
@@ -11,8 +22,9 @@
   padding: 0 4px;
   border: none;
   background: transparent;
-  font-size: 15px;
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 500;
   white-space: nowrap;
 }
 
@@ -26,12 +38,13 @@
 .cal-allday button {
   min-height: 32px;
   padding: 0 12px;
-  border: 1px solid var(--line);
+  border: var(--stroke);
   border-radius: 999px;
   background: var(--card);
-  color: #3a404c;
+  color: var(--ink);
+  font-family: var(--font-display);
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .cal {
@@ -44,6 +57,7 @@
   position: absolute;
   left: 0;
   font-size: 12px;
+  font-weight: 700;
   line-height: 1;
   color: var(--muted);
   transform: translateY(-50%);
@@ -68,15 +82,16 @@
   cursor: pointer;
 }
 
+/* Bloc de tâche : fond pastel de sa liste (--tone-fill), cerné de prune. */
 .cal__block {
   position: absolute;
   z-index: 1;
   overflow: hidden;
-  border: none;
-  border-radius: 14px;
-  padding: 8px 12px;
+  border: var(--stroke);
+  border-radius: 22px;
+  padding: 10px 15px;
   background: var(--tone-fill, var(--soft));
-  color: var(--tone-ink, var(--ink));
+  color: var(--ink);
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
@@ -86,6 +101,7 @@
 
 /* Bloc à peine plus haut qu'une ligne : titre et heure serrés. */
 .cal__block--medium {
+  border-radius: 18px;
   padding-top: 3px;
   padding-bottom: 3px;
   justify-content: center;
@@ -93,8 +109,8 @@
 }
 
 .cal__block--small {
-  border-radius: 10px;
-  padding: 0 10px;
+  border-radius: 14px;
+  padding: 0 12px;
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
@@ -102,9 +118,8 @@
 }
 
 .cal__block--event {
+  border-style: dashed;
   background: var(--card);
-  border: 1px solid var(--line);
-  color: #3a404c;
 }
 
 .cal__title {
@@ -112,8 +127,9 @@
   display: flex;
   align-items: center;
   gap: 6px;
+  font-family: var(--font-display);
   font-size: 15px;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .cal__title > span {
@@ -129,7 +145,7 @@
 .cal__time {
   flex: none;
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 700;
   white-space: nowrap;
 }
 
@@ -144,7 +160,7 @@
 .cal__risk {
   flex: none;
   display: inline-flex;
-  color: #9e1c0c;
+  color: var(--danger);
 }
 
 .cal__now {
@@ -158,20 +174,20 @@
   scroll-margin: 40vh 0;
 }
 
-.cal__now::before {
-  content: '';
-  position: absolute;
-  left: -4px;
-  top: -4px;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--accent);
-}
-
-/* Heure actuelle en clair : affichée seulement par la DA « Trait fin ». */
+/* Pastille jaune avec l'heure, dans la colonne des heures. */
 .cal__now-label {
-  display: none;
+  position: absolute;
+  left: -46px;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 3px 5px;
+  border: var(--stroke);
+  border-radius: 999px;
+  background: var(--pop);
+  color: var(--ink);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
 }
 
 /* Barre sous l'en-tête : choix de la vue + période précédente / suivante. */
@@ -221,7 +237,7 @@
 
 .week__dow {
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--muted);
 }
 
@@ -231,13 +247,16 @@
   border-radius: 50%;
   display: grid;
   place-items: center;
+  font-family: var(--font-display);
   font-size: 15px;
-  font-weight: 600;
+  font-weight: 500;
 }
 
-.week__num--today {
-  background: var(--ink);
-  color: #fff;
+.week__num--today,
+.month__num--today {
+  border: var(--stroke);
+  background: var(--pop);
+  color: var(--ink);
 }
 
 .week__allday {
@@ -255,12 +274,12 @@
 .week__allday-item {
   height: 20px;
   padding: 0 3px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--ink);
   border-radius: 6px;
   background: var(--card);
-  color: #3a404c;
+  color: var(--ink);
   font-size: 10px;
-  font-weight: 600;
+  font-weight: 700;
   text-align: left;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -278,6 +297,7 @@
   width: calc(var(--week-gutter) - 6px);
   text-align: right;
   font-size: 11px;
+  font-weight: 700;
   line-height: 1;
   color: var(--muted);
   transform: translateY(-50%);
@@ -314,18 +334,17 @@
   z-index: 1;
   overflow: hidden;
   padding: 3px 4px;
-  border: none;
-  border-radius: 8px;
+  border: 1px solid var(--ink);
+  border-radius: 10px;
   background: var(--tone-fill, var(--soft));
-  color: var(--tone-ink, var(--ink));
+  color: var(--ink);
   text-align: left;
   display: block;
 }
 
 .week__block--event {
+  border-style: dashed;
   background: var(--card);
-  border: 1px solid var(--line);
-  color: #3a404c;
 }
 
 .week__block--running {
@@ -336,9 +355,10 @@
   display: -webkit-box;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  font-family: var(--font-display);
   font-size: 11px;
   line-height: 13px;
-  font-weight: 600;
+  font-weight: 500;
   overflow-wrap: break-word;
   hyphens: auto;
 }
@@ -366,7 +386,7 @@
   margin-bottom: 6px;
   text-align: center;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--muted);
 }
 
@@ -378,7 +398,7 @@
   min-width: 0;
   height: 56px;
   padding: 5px 0 0;
-  border: 2px solid transparent;
+  border: var(--stroke);
   border-radius: 14px;
   background: var(--card);
   display: flex;
@@ -388,12 +408,13 @@
 }
 
 .month__cell--outside {
+  border-color: transparent;
   background: transparent;
   color: var(--faint);
 }
 
 .month__cell--selected {
-  border-color: var(--ink);
+  background: var(--picked);
 }
 
 .month__num {
@@ -402,13 +423,9 @@
   border-radius: 50%;
   display: grid;
   place-items: center;
+  font-family: var(--font-display);
   font-size: 14px;
-  font-weight: 600;
-}
-
-.month__num--today {
-  background: var(--ink);
-  color: #fff;
+  font-weight: 500;
 }
 
 .month__dots {
@@ -427,7 +444,7 @@
 
 .month__more {
   font-size: 10px;
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1;
   color: var(--muted);
 }
@@ -447,8 +464,9 @@
 
 .cal-agenda__title {
   margin: 0;
+  font-family: var(--font-display);
   font-size: 18px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .cal-agenda__empty {
@@ -459,7 +477,6 @@
 
 .cal-agenda__row {
   width: 100%;
-  border: none;
   text-align: left;
 }
 
@@ -467,6 +484,7 @@
   width: 52px;
   flex: none;
   font-size: 13px;
+  font-weight: 700;
   color: var(--muted);
 }
 
@@ -486,7 +504,7 @@
 
 .add-choices button {
   min-height: 96px;
-  border: none;
+  border: var(--stroke);
   border-radius: 20px;
   background: var(--soft);
   display: flex;
@@ -494,8 +512,9 @@
   align-items: center;
   justify-content: center;
   gap: 10px;
+  font-family: var(--font-display);
   font-size: 17px;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 /* Jours de répétition d'un événement. */

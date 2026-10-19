@@ -103,6 +103,7 @@ export function ProjectSheet({ id, onClose }: { id?: ID; onClose: () => void }) 
                         width: 32,
                         height: 32,
                         borderRadius: '50%',
+                        border: 'var(--stroke)',
                         background: t.dot,
                         boxShadow: selected ? '0 0 0 3px var(--card), 0 0 0 5px var(--ink)' : 'none',
                       }}

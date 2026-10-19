@@ -95,7 +95,7 @@ export function ChronoMode() {
   const bigButton = (bg: string) => ({
     width: 88,
     height: 88,
-    border: 'none',
+    border: 'var(--stroke)',
     borderRadius: '50%',
     background: bg,
     color: '#fff',

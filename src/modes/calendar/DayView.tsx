@@ -112,7 +112,7 @@ export function DayView({ day }: { day: Date }) {
                 key={itemKey(item)}
                 type="button"
                 className={`cal__block${size}`}
-                style={{ ...style, '--tone-fill': tone.fill, '--tone-ink': tone.ink } as CSSProperties}
+                style={{ ...style, '--tone-fill': tone.fill } as CSSProperties}
                 aria-label={`${item.title}, ${formatHM(item.start)} à ${formatHM(item.end)}${running ? ', chrono en cours' : ''}`}
                 onClick={() => openSheet({ kind: 'task', id: item.taskId })}
               >

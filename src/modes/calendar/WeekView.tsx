@@ -141,7 +141,7 @@ export function WeekView({ weekStart, onPickDay }: { weekStart: Date; onPickDay:
                     key={itemKey(item)}
                     type="button"
                     className={running ? 'week__block week__block--running' : 'week__block'}
-                    style={{ top, height: h, '--tone-fill': tone.fill, '--tone-ink': tone.ink, ...columnStyle(p, 1) } as CSSProperties}
+                    style={{ top, height: h, '--tone-fill': tone.fill, ...columnStyle(p, 1) } as CSSProperties}
                     aria-label={`${item.title}, ${when}${running ? ', chrono en cours' : ''}`}
                     onClick={() => openSheet({ kind: 'task', id: item.taskId })}
                   >
