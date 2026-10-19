@@ -59,6 +59,7 @@ export function numClass(mark: DayMark | undefined, isToday: boolean): string {
   else if (mark?.fertile) cls.push('cy-num--fertile');
   else if (mark?.pms) cls.push('cy-num--pms');
   if (mark?.spotting && !mark.period) cls.push('cy-num--spotting');
+  if (cls.length === 1) cls.push('cy-num--plain');
   if (isToday) cls.push('cy-num--today');
   return cls.join(' ');
 }
@@ -130,7 +131,7 @@ export const severityWord = (s: string) => SEVERITY_WORD[s] ?? s;
 export function Legend({ settings }: { settings: CycleSettings }) {
   const items = [
     { label: 'Règles', style: { background: 'var(--cy-period)' } },
-    { label: 'Prévues', style: { background: 'var(--cy-period-soft)', outline: '1px dashed var(--cy-period)' } },
+    { label: 'Prévues', style: { background: 'var(--cy-period-soft)', borderStyle: 'dashed', borderColor: 'var(--cy-period)' } },
     settings.showFertile && { label: 'Fertile', style: { background: 'var(--cy-fertile-soft)' } },
     settings.showOvulation && { label: 'Ovulation', style: { background: 'var(--cy-fertile)' } },
     settings.showPms && { label: 'SPM', style: { background: 'var(--cy-pms-soft)' } },

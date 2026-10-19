@@ -61,7 +61,7 @@ function LengthChart({ cycles, mean }: { cycles: Cycle[]; mean?: number }) {
               width={bw * 0.64}
               height={Math.max(0, H - bottom - y(len))}
               rx={4}
-              style={{ fill: off ? 'var(--line)' : 'var(--cy-period-soft)' }}
+              style={{ fill: off ? 'var(--soft)' : 'var(--cy-period-soft)', stroke: off ? 'var(--faint)' : 'var(--ink)', strokeWidth: 1.2 }}
             />
             <text
               x={i * bw + bw / 2}
@@ -211,7 +211,7 @@ export function CycleAnalysis() {
                 </span>
                 <span className="cy-history__len">{c.length !== undefined ? `${c.length} j` : `J${fc.cycleDay}`}</span>
                 <span className="cy-history__bar" aria-hidden="true">
-                  <span style={{ width: `${(Math.min(len, BAR_MAX) / BAR_MAX) * 100}%`, background: '#cfd5de' }} />
+                  <span style={{ width: `${(Math.min(len, BAR_MAX) / BAR_MAX) * 100}%`, background: 'var(--cy-past)' }} />
                   <span style={{ width: `${(Math.min(c.periodDays, BAR_MAX) / BAR_MAX) * 100}%`, background: 'var(--cy-period)' }} />
                 </span>
               </button>

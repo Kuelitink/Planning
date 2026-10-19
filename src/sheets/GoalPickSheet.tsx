@@ -57,7 +57,7 @@ const rowStyle = (on: boolean) =>
     padding: '8px 12px',
     border: 'none',
     borderRadius: 14,
-    background: on ? 'var(--bg)' : 'transparent',
+    background: on ? 'var(--picked)' : 'transparent',
     display: 'flex',
     alignItems: 'center',
     gap: 12,
@@ -141,7 +141,7 @@ export function GoalPickSheet({ period, periodStart, onClose }: { period: GoalPe
               <button type="button" aria-pressed={on} onClick={() => toggle(t)} style={rowStyle(on)}>
                 <span
                   aria-hidden="true"
-                  style={{ width: 12, height: 12, flex: 'none', borderRadius: '50%', border: `2px solid ${PRIORITY_COLOR[t.priority]}` }}
+                  style={{ width: 12, height: 12, flex: 'none', borderRadius: 3, border: `2px solid ${PRIORITY_COLOR[t.priority]}` }}
                 />
                 <span style={{ flex: 1, minWidth: 0, fontSize: 16, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {t.title}

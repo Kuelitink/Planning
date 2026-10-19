@@ -28,11 +28,12 @@ export function toneOf(color: string | undefined): Tone {
   return TONES.find((t) => t.dot.toLowerCase() === c) ?? NEUTRAL_TONE;
 }
 
+/** Contour des cases et sélecteur de priorité (mêmes valeurs que --p1…--p4 du thème). */
 export const PRIORITY_COLOR: Record<Priority, string> = {
-  1: '#D92D20',
-  2: '#C77700',
-  3: '#586070',
-  4: '#9AA1AD',
+  1: '#D7263D',
+  2: '#E07A00',
+  3: '#8A4D66',
+  4: '#B98AA0',
 };
 
 export const PRIORITY_LABEL: Record<Priority, string> = {

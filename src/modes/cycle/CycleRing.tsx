@@ -33,7 +33,7 @@ function segmentColor(mark: DayMark | undefined, past: boolean): string {
   if (mark?.ovulation) return 'var(--cy-fertile)';
   if (mark?.fertile) return 'var(--cy-fertile-soft)';
   if (mark?.pms) return 'var(--cy-pms-soft)';
-  return past ? '#d3d8e0' : 'var(--soft)';
+  return past ? 'var(--cy-past)' : 'var(--cy-future)';
 }
 
 export function CycleRing({
@@ -71,7 +71,7 @@ export function CycleRing({
             <path
               key={i}
               d={sector(a0, a1)}
-              style={{ fill: segmentColor(mark, past) }}
+              style={{ fill: segmentColor(mark, past), stroke: 'var(--ink)', strokeWidth: 1.2, strokeLinejoin: 'round' }}
               className={pickable ? 'cy-ring__seg' : undefined}
               role={pickable ? 'button' : undefined}
               tabIndex={pickable ? 0 : undefined}
@@ -105,9 +105,9 @@ export function CycleRing({
               <g aria-hidden="true" style={{ pointerEvents: 'none' }}>
                 <path
                   d={sector(a0, a0 + step - gap)}
-                  style={{ fill: 'none', stroke: 'var(--ink)', strokeWidth: 2.5, strokeLinejoin: 'round' }}
+                  style={{ fill: 'none', stroke: 'var(--ink)', strokeWidth: 3, strokeLinejoin: 'round' }}
                 />
-                <circle cx={x} cy={y} r={5.5} style={{ fill: 'var(--ink)' }} />
+                <circle cx={x} cy={y} r={6.5} style={{ fill: 'var(--pop)', stroke: 'var(--ink)', strokeWidth: 1.5 }} />
               </g>
             );
           })()}

@@ -1,6 +1,6 @@
 /** Vue Semaine : 7 colonnes, grille horaire, tâches planifiées et événements. */
 
-import { useEffect, useMemo, useRef, type MouseEvent } from 'react';
+import { useEffect, useMemo, useRef, type CSSProperties, type MouseEvent } from 'react';
 import { dayPlan } from '../../core/daily';
 import { addDays, formatHM, isSameDay, parseHM } from '../../core/time';
 import { useStore } from '../../state/store';
@@ -141,7 +141,7 @@ export function WeekView({ weekStart, onPickDay }: { weekStart: Date; onPickDay:
                     key={itemKey(item)}
                     type="button"
                     className={running ? 'week__block week__block--running' : 'week__block'}
-                    style={{ top, height: h, background: tone.fill, color: tone.ink, ...columnStyle(p, 1) }}
+                    style={{ top, height: h, '--tone-fill': tone.fill, ...columnStyle(p, 1) } as CSSProperties}
                     aria-label={`${item.title}, ${when}${running ? ', chrono en cours' : ''}`}
                     onClick={() => openSheet({ kind: 'task', id: item.taskId })}
                   >

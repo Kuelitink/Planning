@@ -16,7 +16,7 @@ import '../cycle.css';
 
 /** Points affichés au plus par cellule (au-delà : « +n »). */
 const MAX_DOTS = 4;
-const EVENT_DOT = '#9AA1AD';
+const EVENT_DOT = '#B98AA0';
 
 /** Avec « +n », on garde la place d'un point pour le compteur. */
 const shownDots = (n: number) => (n > MAX_DOTS ? MAX_DOTS - 1 : n);

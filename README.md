@@ -39,7 +39,7 @@ node scripts/gen-icons.mjs  # régénère les icônes PNG
 - `src/state/` — état React : `store.tsx` (données, plan, chrono, cycle), `cycle.ts` (prédictions
   du jour, notifications), `nav.tsx` (modes, feuilles),
   `defaults.ts` (premier lancement, exemple), `urgency.ts` (objectifs, tri par urgence, recherche).
-- `src/ui/` — thème (DA « Blocs couleur »), icônes, composants partagés, formats de dates.
+- `src/ui/` — thème (DA « Trait fin » : rose pâle, fin trait prune, Fredoka + Nunito), icônes, composants partagés, formats de dates.
 - `src/modes/` — un fichier par mode (vues du mode Cycle dans `modes/cycle/`) ;
   `src/sheets/` — feuilles du bas (tâche, événement, jour du cycle…).
 - `tests/` — tests Vitest.

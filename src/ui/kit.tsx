@@ -213,7 +213,7 @@ export function Segmented<T extends string | number>({
   );
 }
 
-/** Case ronde : le contour donne la priorité. */
+/** Case carrée : le contour donne la priorité. */
 export function PriorityCheck({
   priority,
   checked,

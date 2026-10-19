@@ -67,7 +67,7 @@ export function TaskRow({ task, meta, late }: { task: Task; meta?: string; late?
   };
 
   return (
-    <li className="row">
+    <li className={running ? 'row row--running' : 'row'}>
       <PriorityCheck
         priority={task.priority}
         checked={done}
