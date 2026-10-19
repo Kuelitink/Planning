@@ -6,7 +6,8 @@
  *   fichier distant a changé entre-temps (autre appareil), on fusionne d'abord sa version
  *   (l'élément modifié le plus récemment gagne), puis on envoie le résultat.
  * - Restauration : on lit, déchiffre et vérifie la sauvegarde ; l'appelant l'importe.
- * Les suppressions ne se propagent pas d'un appareil à l'autre : pensé pour un téléphone.
+ * Les suppressions voyagent avec les données (`ExportData.deleted`) : un élément supprimé sur un
+ * appareil disparaît des autres à la fusion, sauf s'il y a été modifié après la suppression.
  */
 
 import type { ExportData } from '../storage/repository';

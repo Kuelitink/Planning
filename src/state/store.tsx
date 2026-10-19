@@ -593,7 +593,8 @@ export function StoreProvider({ children, repository }: { children: ReactNode; r
 
   const clearCycle = useCallback(async () => {
     const { cycleDays, cycleMarks } = dataRef.current;
-    await Promise.all([...cycleDays.map((d) => repo.remove('cycleDays', d.id)), ...cycleMarks.map((m) => repo.remove('cycleMarks', m.id))]);
+    await repo.removeMany('cycleDays', cycleDays.map((d) => d.id));
+    await repo.removeMany('cycleMarks', cycleMarks.map((m) => m.id));
     dataRef.current = { ...dataRef.current, cycleDays: [], cycleMarks: [] };
     setData((d) => ({ ...d, cycleDays: [], cycleMarks: [] }));
   }, [repo]);

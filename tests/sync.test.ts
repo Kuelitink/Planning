@@ -127,4 +127,28 @@ describe('sauvegarde', () => {
     const final = (await pullBackup(a.deps))!;
     expect(final.data.tasks.map((t) => t.id).sort()).toEqual(['De A', 'De B', 'Encore A']);
   });
+
+  it("propage une suppression d'un appareil à l'autre", async () => {
+    const gh = fakeGitHub();
+    const a = await device(gh.fetchFn);
+    await a.repo.put('tasks', task('Rapport'));
+    await a.repo.put('tasks', task('Courses'));
+    const stateA = await pushBackup(a.deps, {});
+
+    const env = parseEnvelope((await getFile(target, gh.fetchFn))!.text);
+    const b = await device(gh.fetchFn, 'mot de passe solide', env.kdf);
+    const remote = (await pullBackup(b.deps))!;
+    await b.repo.importAll(remote.data, 'merge');
+    const stateB = { sha: remote.sha };
+
+    // A supprime « Courses » et envoie ; B, qui l'a encore, modifie autre chose et envoie à son tour.
+    await a.repo.remove('tasks', 'Courses');
+    await pushBackup(a.deps, stateA);
+    await b.repo.put('tasks', task('Ménage'));
+    await pushBackup(b.deps, stateB);
+
+    expect((await b.repo.list('tasks')).map((t) => t.id).sort()).toEqual(['Ménage', 'Rapport']);
+    const final = (await pullBackup(a.deps))!;
+    expect(final.data.tasks.map((t) => t.id).sort()).toEqual(['Ménage', 'Rapport']);
+  });
 });

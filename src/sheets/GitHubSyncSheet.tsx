@@ -172,8 +172,9 @@ export function GitHubSyncSheet({ onClose }: { onClose: () => void }) {
         {working && <p className="cy-foot">{working}</p>}
         <p className="cy-foot">
           Les données sont chiffrées sur le téléphone avant l'envoi (AES-256) : sur GitHub, le fichier est illisible sans ton mot de passe.
-          L'envoi se fait une minute après chaque modification et quand tu quittes l'appli, tant qu'elle est ouverte. Pensé pour un
-          téléphone : avec plusieurs appareils, une suppression peut revenir.
+          L'envoi se fait une minute après chaque modification et quand tu quittes l'appli, tant qu'elle est ouverte. Plusieurs
+          appareils (téléphone, appli Android, ordinateur) peuvent partager la même sauvegarde : ajouts, modifications et suppressions
+          passent de l'un à l'autre.
         </p>
       </Sheet>
     );

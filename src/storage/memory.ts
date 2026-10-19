@@ -4,10 +4,13 @@ import {
   COLLECTIONS,
   EXPORT_APP,
   EXPORT_VERSION,
-  newer,
+  liveDeleted,
+  markDeleted,
+  mergeCollection,
   pickSettings,
   type CollectionName,
   type Collections,
+  type Deleted,
   type ExportData,
   type Repository,
 } from './repository';
@@ -16,6 +19,7 @@ import {
 export class MemoryRepository implements Repository {
   private data = new Map<CollectionName, Map<ID, unknown>>(COLLECTIONS.map((c) => [c, new Map()]));
   private settings: Settings = { ...DEFAULT_SETTINGS };
+  private deleted: Deleted = {};
 
   async list<K extends CollectionName>(collection: K): Promise<Collections[K][]> {
     return [...this.data.get(collection)!.values()].map((x) => structuredClone(x)) as Collections[K][];
@@ -35,7 +39,13 @@ export class MemoryRepository implements Repository {
   }
 
   async remove(collection: CollectionName, id: ID): Promise<void> {
-    this.data.get(collection)!.delete(id);
+    await this.removeMany(collection, [id]);
+  }
+
+  async removeMany(collection: CollectionName, ids: ID[]): Promise<void> {
+    if (!ids.length) return;
+    for (const id of ids) this.data.get(collection)!.delete(id);
+    this.deleted = markDeleted(this.deleted, collection, ids);
   }
 
   async getSettings(): Promise<Settings> {
@@ -54,17 +64,22 @@ export class MemoryRepository implements Repository {
       settings: await this.getSettings(),
     } as ExportData;
     for (const c of COLLECTIONS) (out as Record<string, unknown>)[c] = await this.list(c);
+    out.deleted = liveDeleted(this.deleted, out);
     return out;
   }
 
   async importAll(data: ExportData, mode: 'replace' | 'merge' = 'merge'): Promise<void> {
+    if (mode === 'replace') this.deleted = {};
+    const deleted: Deleted = {};
     for (const c of COLLECTIONS) {
       const store = this.data.get(c)!;
       if (mode === 'replace') store.clear();
-      for (const item of data[c] as { id: ID; updatedAt: string }[]) {
-        store.set(item.id, structuredClone(newer(store.get(item.id) as typeof item | undefined, item)));
-      }
+      const merged = mergeCollection(await this.list(c), this.deleted[c], data[c], data.deleted?.[c]);
+      for (const id of merged.remove) store.delete(id);
+      for (const item of merged.put) store.set(item.id, structuredClone(item));
+      deleted[c] = merged.deleted;
     }
+    this.deleted = deleted;
     this.settings = pickSettings(this.settings, data.settings, mode);
   }
 }
