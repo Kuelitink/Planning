@@ -191,6 +191,8 @@ export interface CycleSettings {
   notify: boolean;
   /** Règles (notées et prévues) visibles dans le mode Calendrier. */
   onCalendar: boolean;
+  /** Auto-planification : alléger les journées en phase lutéale et pendant les règles (voir `cycleLoad.ts`). */
+  adaptLoad: boolean;
 }
 
 export interface Settings {

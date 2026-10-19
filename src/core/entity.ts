@@ -17,14 +17,17 @@ export function touch<T extends Entity>(entity: T, changes: Partial<Omit<T, keyo
 
 export type NewTask = Partial<Omit<Task, keyof Entity>> & { title: string };
 
-/** Tâche avec des valeurs par défaut raisonnables (P3, 30 min, non découpable). */
+/**
+ * Tâche avec des valeurs par défaut raisonnables : priorité normale (3), 1 h, sans échéance,
+ * découpable en morceaux d'au moins 15 min (mêmes valeurs que la fiche d'une nouvelle tâche).
+ */
 export function createTask(fields: NewTask, now = new Date(), id?: ID): Task {
   return createEntity<Task>(
     {
       priority: 3 as Priority,
-      durationMin: 30,
+      durationMin: 60,
       dependsOn: [],
-      splittable: false,
+      splittable: true,
       minChunkMin: 15,
       status: 'todo',
       ...fields,

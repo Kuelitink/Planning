@@ -2,13 +2,15 @@
 
 import { useEffect, useMemo, useRef, type CSSProperties, type MouseEvent } from 'react';
 import { dayPlan } from '../../core/daily';
-import { formatHM, isSameDay, parseHM } from '../../core/time';
+import { formatHM, isSameDay, parseHM, toISODate } from '../../core/time';
 import { useStore } from '../../state/store';
 import { useNav } from '../../state/nav';
 import { useNow } from '../../ui/kit';
 import { IconFlag, IconTimer } from '../../ui/icons';
 import { toneOf } from '../../ui/palette';
 import { columnStyle, hourLabel, hourRange, isAllDay, isTimed, itemKey, layout, minutesOf, quarterAt } from './shared';
+import { OvulationDot, dayPhase, describeMark, phaseClass, useCalendarMarks } from '../cycle/shared';
+import '../cycle.css';
 
 const HOUR_PX = 60;
 /** En dessous de cette hauteur, un bloc tient sur une ligne (titre + heure). */
@@ -27,6 +29,11 @@ export function DayView({ day }: { day: Date }) {
     () => ({ allDay: dp.items.filter(isAllDay), placed: layout(dp.items.filter(isTimed), day) }),
     [dp, day],
   );
+  // Phase du cycle du jour : une étiquette discrète au-dessus de la timeline.
+  const dayKey = toISODate(day);
+  const cycleMark = useCalendarMarks(dayKey, dayKey)?.get(dayKey);
+  const phase = dayPhase(cycleMark);
+
   const atRisk = useMemo(() => new Set(plan.atRisk.map((r) => r.taskId)), [plan.atRisk]);
 
   const nowMin = minutesOf(now, day);
@@ -56,6 +63,14 @@ export function DayView({ day }: { day: Date }) {
 
   return (
     <>
+      {phase && (
+        <p className="cal-cycle">
+          <span className={`cal-cycle__tag ${phaseClass(phase)}`}>
+            {phase === 'ovulation' && <OvulationDot />}
+            {describeMark(cycleMark, dayKey > toISODate(now))}
+          </span>
+        </p>
+      )}
       {allDay.length > 0 && (
         <div className="cal-allday">
           {allDay.map((ev) => (

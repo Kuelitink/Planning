@@ -34,13 +34,23 @@
  *    `atRisk`. Sans place dans l'horizon : `unscheduled` (`no-slot`). Les tâches
  *    d'un cycle de dépendances : `cycle` ; celles qui dépendent d'une tâche non
  *    planifiée : `dependency` ; durée invalide : `invalid`.
+ * 6. Charge du jour (`dayLoad`, facultatif, calculé d'après le cycle par `cycleLoad.ts`) :
+ *    un jour de facteur f < 1 accepte au plus f × (temps libre des horaires par défaut ce
+ *    jour-là, événements déduits) de tâches. Comptent : les tâches épinglées, celles déjà
+ *    placées, et le jour même les tâches faites aujourd'hui (leur durée). Une tâche
+ *    découpable y place des morceaux limités au budget restant (arrondi à la grille, au
+ *    moins `minChunkMin`) ; une tâche d'un seul tenant saute les jours où il ne suffit
+ *    pas. Plafond souple : si la tâche ne trouve pas de place, ou finirait après son
+ *    échéance effective à cause du plafond, elle est placée comme sans plafond (le budget
+ *    du jour est alors dépassé). Jours absents de la table, f ≥ 1 ou sans horaires par
+ *    défaut : pas de plafond. Sans `dayLoad`, rien ne change.
  */
 
-import type { CalendarEvent, ID, Priority, Project, Settings, Task, TimeWindow } from './types';
+import type { CalendarEvent, ID, ISODate, Priority, Project, Settings, Task, TimeWindow } from './types';
 import { expandEvents } from './events';
-import { clip, normalize, subtract, type Interval } from './intervals';
-import { addDays, DAY, MINUTE, parseDateTime, parseISODate, isDateOnly, roundUpToGrid, startOfDay } from './time';
-import { rulesForTask, windowAvailability } from './windows';
+import { clip, normalize, subtract, totalLength, type Interval } from './intervals';
+import { addDays, DAY, MINUTE, parseDateTime, parseISODate, isDateOnly, roundUpToGrid, startOfDay, toISODate } from './time';
+import { defaultRules, defaultWindow, rulesForTask, windowAvailability } from './windows';
 
 export const PRIORITY_HORIZON_DAYS: Record<Priority, number> = { 1: 1, 2: 3, 3: 7, 4: 14 };
 
@@ -51,6 +61,11 @@ export interface ScheduleInput {
   projects?: Project[];
   settings: Settings;
   now: Date;
+  /**
+   * Facteur de charge par jour (0..1) : part du temps libre de la journée que les tâches
+   * peuvent occuper (règle 6). Jour absent = pas de plafond.
+   */
+  dayLoad?: Record<ISODate, number>;
 }
 
 export interface ScheduledBlock {
@@ -95,6 +110,8 @@ export function schedule(input: ScheduleInput): ScheduleResult {
     if (!occ.allDay) addBusy(occ.start.getTime(), occ.end.getTime());
   }
 
+  const budget = input.dayLoad ? loadBudget(input, input.dayLoad, horizonEnd) : null;
+
   /** Fin du dernier bloc de chaque tâche placée (ou épinglée). */
   const lastEnd = new Map<ID, number>();
   for (const t of todo) {
@@ -103,6 +120,7 @@ export function schedule(input: ScheduleInput): ScheduleResult {
     const end = parseDateTime(t.pinned.end);
     result.blocks.push({ taskId: t.id, start, end, pinned: true });
     addBusy(start.getTime(), end.getTime());
+    if (budget) consume(budget, start.getTime(), end.getTime());
     lastEnd.set(t.id, end.getTime());
     flagRisk(result, t, end);
   }
@@ -196,9 +214,13 @@ export function schedule(input: ScheduleInput): ScheduleResult {
     }
 
     const free = subtract(clip(availability(task), earliest, horizonEnd), busy);
-    const placed = task.splittable
-      ? placeSplit(free, earliest, task.durationMin * MINUTE, Math.max(1, task.minChunkMin) * MINUTE, grid)
-      : placeWhole(free, earliest, task.durationMin * MINUTE, grid);
+    const duration = task.durationMin * MINUTE;
+    const minChunk = Math.max(1, task.minChunkMin) * MINUTE;
+    const place = (b: Budget | null) =>
+      task.splittable ? placeSplit(free, earliest, duration, minChunk, grid, b) : placeWhole(free, earliest, duration, grid, b);
+    // Plafond souple : sans place, ou en retard à cause de lui, on place sans plafond.
+    let placed = budget ? place(budget) : null;
+    if (!placed || placed[placed.length - 1].end > effDeadline.get(task.id)!) placed = place(null);
 
     if (!placed) {
       result.unscheduled.push({ taskId: task.id, reason: 'no-slot' });
@@ -208,6 +230,7 @@ export function schedule(input: ScheduleInput): ScheduleResult {
     for (const iv of placed) {
       result.blocks.push({ taskId: task.id, start: new Date(iv.start), end: new Date(iv.end) });
       addBusy(iv.start, iv.end);
+      if (budget) consume(budget, iv.start, iv.end);
     }
     const end = placed[placed.length - 1].end;
     lastEnd.set(task.id, end);
@@ -225,38 +248,139 @@ function flagRisk(result: ScheduleResult, task: Task, end: Date): void {
   if (end.getTime() > deadline.getTime()) result.atRisk.push({ taskId: task.id, reason: 'deadline', deadline, end });
 }
 
-/** Premier créneau d'un seul tenant assez long, début aligné sur la grille. */
-function placeWhole(free: Interval[], earliest: number, duration: number, grid: number): Interval[] | null {
+// --- Charge du jour (règle 6) ------------------------------------------------
+
+/** Temps de tâches encore accepté par jour plafonné (ms, peut devenir négatif). */
+type Budget = Map<ISODate, number>;
+
+/** Parcourt les morceaux de [start, end[ jour par jour (heure locale). */
+function forEachDay(start: number, end: number, fn: (day: ISODate, ms: number, dayStart: number) => void): void {
+  for (let day = startOfDay(new Date(start)); day.getTime() < end; day = addDays(day, 1)) {
+    const next = addDays(day, 1).getTime();
+    const ms = Math.min(end, next) - Math.max(start, day.getTime());
+    if (ms > 0) fn(toISODate(day), ms, day.getTime());
+  }
+}
+
+function consume(budget: Budget, start: number, end: number): void {
+  forEachDay(start, end, (day, ms) => {
+    const left = budget.get(day);
+    if (left !== undefined) budget.set(day, left - ms);
+  });
+}
+
+/** Budget initial : f × (horaires par défaut − événements), moins les tâches faites aujourd'hui. */
+function loadBudget(input: ScheduleInput, dayLoad: Record<ISODate, number>, horizonEnd: number): Budget | null {
+  const { windows, settings, events, now } = input;
+  const budget: Budget = new Map();
+  const today = startOfDay(now);
+  const occupied = normalize(
+    expandEvents(events, today, new Date(horizonEnd))
+      .filter((o) => !o.allDay)
+      .map((o) => ({ start: o.start.getTime(), end: o.end.getTime() })),
+  );
+  for (let day = today; day.getTime() < horizonEnd; day = addDays(day, 1)) {
+    const iso = toISODate(day);
+    const f = dayLoad[iso];
+    if (f === undefined || !(f < 1)) continue;
+    const from = day.getTime();
+    const to = addDays(day, 1).getTime();
+    const capacity = windowAvailability(defaultWindow(windows, settings), defaultRules(windows, settings), from, to);
+    if (totalLength(capacity) <= 0) continue;
+    budget.set(iso, Math.max(0, f) * totalLength(subtract(capacity, occupied)));
+  }
+  if (budget.size === 0) return null;
+  const todayIso = toISODate(today);
+  if (budget.has(todayIso)) {
+    for (const t of input.tasks) {
+      if (t.status === 'done' && t.doneAt && toISODate(parseDateTime(t.doneAt)) === todayIso && t.durationMin > 0) {
+        budget.set(todayIso, budget.get(todayIso)! - t.durationMin * MINUTE);
+      }
+    }
+  }
+  return budget;
+}
+
+/** Jour (début, ms) dont le budget ne suffit pas pour [start, end[, sinon null. */
+function overBudget(budget: Budget, start: number, end: number): number | null {
+  let blocked: number | null = null;
+  forEachDay(start, end, (day, ms, dayStart) => {
+    const left = budget.get(day);
+    if (blocked === null && left !== undefined && left < ms) blocked = dayStart;
+  });
+  return blocked;
+}
+
+// --- Placement ---------------------------------------------------------------
+
+/** Premier créneau d'un seul tenant assez long (et dans le budget), début aligné sur la grille. */
+function placeWhole(free: Interval[], earliest: number, duration: number, grid: number, budget: Budget | null): Interval[] | null {
   for (const iv of free) {
-    const start = roundUpToGrid(Math.max(iv.start, earliest), grid);
-    if (start + duration <= iv.end) return [{ start, end: start + duration }];
+    let start = roundUpToGrid(Math.max(iv.start, earliest), grid);
+    while (start + duration <= iv.end) {
+      const blocked = budget && overBudget(budget, start, start + duration);
+      if (blocked === null) return [{ start, end: start + duration }];
+      // Jour de début trop chargé : lendemain ; jour suivant trop chargé : un cran plus tard.
+      start =
+        blocked <= start
+          ? roundUpToGrid(addDays(new Date(blocked), 1).getTime(), grid)
+          : roundUpToGrid(start + 1, grid);
+    }
   }
   return null;
 }
 
-/** Remplit les créneaux au plus tôt par morceaux d'au moins `minChunk`. */
+/**
+ * Remplit les créneaux au plus tôt par morceaux d'au moins `minChunk`. Avec un budget,
+ * les créneaux sont coupés à minuit et chaque morceau est limité au budget restant du
+ * jour, arrondi à la grille.
+ */
 function placeSplit(
   free: Interval[],
   earliest: number,
   duration: number,
   minChunk: number,
   grid: number,
+  budget: Budget | null,
 ): Interval[] | null {
+  const pieces = budget ? free.flatMap((iv) => splitAtMidnight(iv)) : free;
+  const step = grid * MINUTE;
+  const used = new Map<ISODate, number>();
   const chunks: Interval[] = [];
   let remaining = duration;
-  for (const iv of free) {
+  for (const iv of pieces) {
     if (remaining <= 0) break;
     const start = roundUpToGrid(Math.max(iv.start, earliest), grid);
-    const available = iv.end - start;
+    let available = iv.end - start;
+    const day = toISODate(new Date(start));
+    const left = budget?.get(day);
+    if (left !== undefined) available = Math.min(available, Math.floor((left - (used.get(day) ?? 0)) / step) * step);
     let size = Math.min(remaining, available);
     // Ne pas laisser un reste plus petit qu'un morceau minimal.
     const rest = remaining - size;
     if (rest > 0 && rest < minChunk) size = remaining - minChunk;
     if (size < Math.min(minChunk, remaining)) continue;
     chunks.push({ start, end: start + size });
+    used.set(day, (used.get(day) ?? 0) + size);
     remaining -= size;
   }
-  return remaining <= 0 ? chunks : null;
+  if (remaining > 0) return null;
+  // Recolle les morceaux coupés à minuit.
+  return chunks.reduce<Interval[]>((out, c) => {
+    const prev = out[out.length - 1];
+    if (prev && prev.end === c.start) prev.end = c.end;
+    else out.push({ ...c });
+    return out;
+  }, []);
+}
+
+function splitAtMidnight(iv: Interval): Interval[] {
+  const out: Interval[] = [];
+  forEachDay(iv.start, iv.end, (_day, ms, dayStart) => {
+    const start = Math.max(iv.start, dayStart);
+    out.push({ start, end: start + ms });
+  });
+  return out;
 }
 
 /** Tâches appartenant à un cycle de dépendances (algorithme de Tarjan). */

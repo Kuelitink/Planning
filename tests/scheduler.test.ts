@@ -326,3 +326,113 @@ describe('schedule — changement d’heure (25 oct. 2026, Paris)', () => {
     expect(blocksOf(r, 'Nuit')).toEqual([['10-24 22:00', '10-25 06:00']]);
   });
 });
+
+describe('schedule — charge du jour (dayLoad)', () => {
+  // Horaires par défaut 08:00–20:00 : 720 min de capacité par jour.
+  const hour = (title: string, fields: Parameters<typeof task>[1] = {}) =>
+    task(title, { durationMin: 60, splittable: false, minChunkMin: 15, ...fields });
+
+  it('sans facteur < 1, le résultat est exactement le même', () => {
+    const tasks = [
+      hour('A', { priority: 1 }),
+      task('B', { durationMin: 300, splittable: true, minChunkMin: 30 }),
+      hour('C', { deadline: '2026-10-20' }),
+      task('Nuit', { durationMin: 120, splittable: true, minChunkMin: 30, windowId: 'nuit' }),
+    ];
+    const windows = [hours('nuit', '22:00', '02:00')];
+    const events = [event('Réunion', '2026-10-19 09:00', '2026-10-19 11:00')];
+    const base = run({ tasks, windows, events });
+    expect(run({ tasks, windows, events, dayLoad: {} })).toEqual(base);
+    expect(run({ tasks, windows, events, dayLoad: { '2026-10-19': 1, '2026-10-20': 1.2 } })).toEqual(base);
+  });
+
+  it('plafonne les tâches d’un jour à facteur × temps libre', () => {
+    const tasks = ['T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8'].map((t) => hour(t));
+    const r = run({ tasks, dayLoad: { '2026-10-19': 0.5 } });
+    const monday = r.blocks.filter((b) => b.start.getDate() === 19);
+    expect(monday).toHaveLength(6); // 0,5 × 720 min = 6 h
+    expect(blocksOf(r, 'T6')).toEqual([['10-19 13:00', '10-19 14:00']]);
+    expect(blocksOf(r, 'T7')).toEqual([['10-20 08:00', '10-20 09:00']]);
+    expect(blocksOf(r, 'T8')).toEqual([['10-20 09:00', '10-20 10:00']]);
+    expect(r.unscheduled).toEqual([]);
+  });
+
+  it('déduit les événements du temps libre avant d’appliquer le facteur', () => {
+    const tasks = ['T1', 'T2', 'T3', 'T4', 'T5'].map((t) => hour(t));
+    const events = [event('Réunion', '2026-10-19 08:00', '2026-10-19 12:00')];
+    // (720 − 240) × 0,5 = 240 min de tâches.
+    const r = run({ tasks, events, dayLoad: { '2026-10-19': 0.5 } });
+    expect(blocksOf(r, 'T4')).toEqual([['10-19 15:00', '10-19 16:00']]);
+    expect(blocksOf(r, 'T5')).toEqual([['10-20 08:00', '10-20 09:00']]);
+  });
+
+  it('une tâche d’un seul tenant saute un jour dont le budget restant ne suffit pas', () => {
+    // 0,25 × 720 = 180 min : après « Long » (150 min), il reste 30 min.
+    const r = run({
+      tasks: [hour('Long', { durationMin: 150, priority: 1 }), hour('Heure')],
+      dayLoad: { '2026-10-19': 0.25 },
+    });
+    expect(blocksOf(r, 'Long')).toEqual([['10-19 08:00', '10-19 10:30']]);
+    expect(blocksOf(r, 'Heure')).toEqual([['10-20 08:00', '10-20 09:00']]);
+  });
+
+  it('une tâche découpable est limitée au budget du jour', () => {
+    const r = run({
+      tasks: [task('Gros', { durationMin: 300, splittable: true, minChunkMin: 30 })],
+      dayLoad: { '2026-10-19': 0.25, '2026-10-20': 0.25 },
+    });
+    expect(blocksOf(r, 'Gros')).toEqual([
+      ['10-19 08:00', '10-19 11:00'],
+      ['10-20 08:00', '10-20 10:00'],
+    ]);
+  });
+
+  it('pas de morceau plus petit que minChunkMin ; les tâches épinglées comptent', () => {
+    // 180 min de budget, dont 160 pris par la tâche épinglée : 20 min < 30 min.
+    const pinned = hour('Épinglée', {
+      pinned: { start: at('2026-10-19 14:00').toISOString(), end: at('2026-10-19 16:40').toISOString() },
+    });
+    const r = run({
+      tasks: [pinned, task('Découpable', { durationMin: 60, splittable: true, minChunkMin: 30 })],
+      dayLoad: { '2026-10-19': 0.25 },
+    });
+    expect(blocksOf(r, 'Épinglée')).toEqual([['10-19 14:00', '10-19 16:40']]);
+    expect(blocksOf(r, 'Découpable')).toEqual([['10-20 08:00', '10-20 09:00']]);
+  });
+
+  it('les tâches faites aujourd’hui entament le budget du jour', () => {
+    const done = hour('Faite', { durationMin: 300, status: 'done', doneAt: at('2026-10-19 07:00').toISOString() });
+    // 360 − 300 = 60 min : la tâche de 2 h passe au lendemain.
+    const r = run({ tasks: [done, hour('Deux heures', { durationMin: 120 })], dayLoad: { '2026-10-19': 0.5 } });
+    expect(blocksOf(r, 'Deux heures')).toEqual([['10-20 08:00', '10-20 10:00']]);
+  });
+
+  it('plafond souple : jamais de retard à cause du plafond', () => {
+    // 0,1 × 720 = 72 min : « Due ce soir » ne tient pas, mais serait en retard demain.
+    const r = run({
+      tasks: [hour('Due ce soir', { durationMin: 120, deadline: '2026-10-19' }), hour('Sans échéance', { durationMin: 120 })],
+      dayLoad: { '2026-10-19': 0.1 },
+    });
+    expect(blocksOf(r, 'Due ce soir')).toEqual([['10-19 08:00', '10-19 10:00']]);
+    expect(blocksOf(r, 'Sans échéance')).toEqual([['10-20 08:00', '10-20 10:00']]);
+    expect(r.atRisk).toEqual([]);
+  });
+
+  it('plafond souple : placée sans plafond plutôt que « pas de créneau »', () => {
+    const r = run({
+      tasks: [hour('Longue', { durationMin: 120 })],
+      settings: settings({ horizonDays: 2 }),
+      dayLoad: { '2026-10-19': 0.1, '2026-10-20': 0.1 },
+    });
+    expect(blocksOf(r, 'Longue')).toEqual([['10-19 08:00', '10-19 10:00']]);
+    expect(r.unscheduled).toEqual([]);
+  });
+
+  it('allège davantage les jours de plus faible facteur', () => {
+    const tasks = Array.from({ length: 30 }, (_, i) => hour(`T${String(i).padStart(2, '0')}`));
+    const r = run({ tasks, dayLoad: { '2026-10-19': 0.85, '2026-10-20': 0.5, '2026-10-21': 0.7 } });
+    const perDay = (d: number) => r.blocks.filter((b) => b.start.getDate() === d).length;
+    // 612, 360 et 504 min de budget, puis une journée pleine (12 h) pour le reste.
+    expect([perDay(19), perDay(20), perDay(21), perDay(22)]).toEqual([10, 6, 8, 6]);
+  });
+});

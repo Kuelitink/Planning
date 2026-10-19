@@ -2,13 +2,15 @@
 
 import { useEffect, useMemo, useRef, type CSSProperties, type MouseEvent } from 'react';
 import { dayPlan } from '../../core/daily';
-import { addDays, formatHM, isSameDay, parseHM } from '../../core/time';
+import { addDays, formatHM, isSameDay, parseHM, toISODate } from '../../core/time';
 import { useStore } from '../../state/store';
 import { useNav } from '../../state/nav';
 import { useNow } from '../../ui/kit';
 import { formatDayLong } from '../../ui/format';
 import { toneOf } from '../../ui/palette';
 import { columnStyle, hourLabel, hourRange, isAllDay, isTimed, itemKey, layout, minutesOf, quarterAt } from './shared';
+import { OvulationDot, dayPhase, describeMark, phaseClass, useCalendarMarks } from '../cycle/shared';
+import '../cycle.css';
 
 const HOUR_PX = 48;
 /** Hauteur d'une ligne de titre (11px) dans un bloc. */
@@ -28,6 +30,10 @@ export function WeekView({ weekStart, onPickDay }: { weekStart: Date; onPickDay:
       return { day, allDay: dp.items.filter(isAllDay), placed: layout(dp.items.filter(isTimed), day) };
     });
   }, [startKey, plan, tasks, events, windows, settings]);
+
+  // Phases du cycle : un repère dans l'en-tête des jours, pas sur la grille horaire.
+  const cycleMarks = useCalendarMarks(toISODate(new Date(startKey)), toISODate(addDays(new Date(startKey), 6)));
+  const todayISO = toISODate(now);
 
   const todayIdx = columns.findIndex((c) => isSameDay(c.day, now));
   const nowMin = todayIdx >= 0 ? minutesOf(now, columns[todayIdx].day) : null;
@@ -64,8 +70,20 @@ export function WeekView({ weekStart, onPickDay }: { weekStart: Date; onPickDay:
         <span className="week__corner" aria-hidden="true" />
         {columns.map(({ day }) => {
           const today = isSameDay(day, now);
+          const key = toISODate(day);
+          const mark = cycleMarks?.get(key);
+          const phase = dayPhase(mark);
+          const cycleLabel = phase ? `, ${describeMark(mark, key > todayISO)}` : '';
           return (
-            <button key={day.getTime()} type="button" className="week__day" aria-label={`${formatDayLong(day)} — voir la journée`} onClick={() => onPickDay(day)}>
+            <button
+              key={day.getTime()}
+              type="button"
+              className={phase ? `week__day ${phaseClass(phase)}` : 'week__day'}
+              aria-label={`${formatDayLong(day)}${cycleLabel} — voir la journée`}
+              title={phase ? describeMark(mark, key > todayISO) : undefined}
+              onClick={() => onPickDay(day)}
+            >
+              {phase === 'ovulation' && <OvulationDot />}
               <span className="week__dow" aria-hidden="true">
                 {WEEKDAY_INITIAL[day.getDay()]}
               </span>

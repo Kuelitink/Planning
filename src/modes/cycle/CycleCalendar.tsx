@@ -1,4 +1,7 @@
-/** Vue Calendrier du mode Cycle : règles notées et prévues, fenêtres fertiles, SPM, jours notés. */
+/**
+ * Vue Calendrier du mode Cycle : chaque case prend la couleur de sa phase (règles notées et
+ * prévues, fenêtre fertile, SPM), une pastille pour l'ovulation estimée, un point par jour noté.
+ */
 
 import { useMemo, useRef, useState, type TouchEvent } from 'react';
 import type { ISODate } from '../../core/types';
@@ -9,7 +12,7 @@ import { useNav } from '../../state/nav';
 import { useStore } from '../../state/store';
 import { IconChevronLeft, IconChevronRight } from '../../ui/icons';
 import { formatDayLong, formatMonth } from '../../ui/format';
-import { DayChips, Legend, WEEKDAY_LETTER, describeMark, numClass } from './shared';
+import { DayChips, DayMarks, Legend, OvulationDot, WEEKDAY_LETTER, dayPhase, describeMark, phaseClass } from './shared';
 
 const SWIPE_PX = 60;
 
@@ -86,24 +89,28 @@ export function CycleCalendar() {
           </span>
         ))}
         {days.map((date) => {
-          const mark = marks.get(date);
+          // Les jours des mois voisins restent neutres : leurs phases s'affichent dans leur mois.
           const outside = Number(date.slice(5, 7)) - 1 !== month.getMonth();
+          const mark = outside ? undefined : marks.get(date);
+          const phase = dayPhase(mark);
+          const cls = ['cy-month__cell', outside && 'cy-month__cell--outside', phaseClass(phase), date === today && 'cy-month__cell--today'];
           return (
             <button
               key={date}
               type="button"
-              className={outside ? 'cy-month__cell cy-month__cell--outside' : 'cy-month__cell'}
+              className={cls.filter(Boolean).join(' ')}
               aria-pressed={date === selected}
-              aria-label={`${date.slice(8)} — ${describeMark(mark, date > today) || 'rien'}`}
+              aria-label={`${date.slice(8)}${date === today ? ", aujourd'hui" : ''} — ${describeMark(marks.get(date), date > today) || 'rien'}`}
               onClick={() => setSelected(date)}
             >
-              <span className={numClass(mark, date === today)}>{Number(date.slice(8))}</span>
-              <span className={mark?.logged ? 'cy-logdot' : 'cy-logdot cy-logdot--none'} aria-hidden="true" />
+              <span className="cy-num">{Number(date.slice(8))}</span>
+              {phase === 'ovulation' && <OvulationDot />}
+              <DayMarks mark={mark} />
             </button>
           );
         })}
       </div>
-      <Legend settings={settings} />
+      <Legend settings={settings} variant="calendar" />
 
       <section className="section cy-card" aria-label={formatDayLong(selDate)}>
         <div className="cy-card__head">

@@ -1,10 +1,13 @@
-/** L'anneau du cycle, façon Clue : un segment par jour, coloré selon la phase. */
+/**
+ * L'anneau du cycle, façon Clue : un segment par jour, coloré selon la phase, avec le même
+ * code couleur que les calendriers (voir `dayPhase` et la légende).
+ */
 
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import type { DayMark } from '../../core/cycle';
 import { addDaysISO } from '../../core/cycle';
 import type { ISODate } from '../../core/types';
-import { describeMark, dayShort } from './shared';
+import { dayPhase, describeMark, dayShort, type DayPhase } from './shared';
 
 const SIZE = 340;
 const C = SIZE / 2;
@@ -27,13 +30,23 @@ function sector(a0: number, a1: number): string {
   return `M${f(x0)} ${f(y0)}A${OUTER} ${OUTER} 0 ${large} 1 ${f(x1)} ${f(y1)}L${f(x2)} ${f(y2)}A${INNER} ${INNER} 0 ${large} 0 ${f(x3)} ${f(y3)}Z`;
 }
 
-function segmentColor(mark: DayMark | undefined, past: boolean): string {
-  if (mark?.period === 'logged') return 'var(--cy-period)';
-  if (mark?.period === 'predicted') return 'var(--cy-period-soft)';
-  if (mark?.ovulation) return 'var(--cy-fertile)';
-  if (mark?.fertile) return 'var(--cy-fertile-soft)';
-  if (mark?.pms) return 'var(--cy-pms-soft)';
-  return past ? 'var(--cy-past)' : 'var(--cy-future)';
+const SEGMENT: Record<DayPhase, CSSProperties> = {
+  period: { fill: 'var(--cy-period)' },
+  // Prévu : couleur désaturée et trait pointillé, comme dans le calendrier.
+  predicted: { fill: 'var(--cy-predicted)', stroke: 'var(--cy-period)', strokeDasharray: '4 2.5' },
+  fertile: { fill: 'var(--cy-fertile-soft)' },
+  ovulation: { fill: 'var(--cy-fertile-soft)' },
+  pms: { fill: 'var(--cy-pms-soft)' },
+};
+
+function segmentStyle(phase: DayPhase | undefined): CSSProperties {
+  return {
+    fill: 'var(--card)',
+    stroke: 'var(--ink)',
+    strokeWidth: 1.2,
+    strokeLinejoin: 'round',
+    ...(phase && SEGMENT[phase]),
+  };
 }
 
 export function CycleRing({
@@ -64,14 +77,13 @@ export function CycleRing({
           const a0 = -90 + i * step + gap / 2;
           const a1 = a0 + step - gap;
           const mark = date ? marks.get(date) : undefined;
-          const past = date !== undefined && date < today;
           const pickable = date !== undefined && date <= today;
           const label = date ? `${dayShort(date)} — ${describeMark(mark, date > today) || `Jour ${i + 1}`}` : undefined;
           return (
             <path
               key={i}
               d={sector(a0, a1)}
-              style={{ fill: segmentColor(mark, past), stroke: 'var(--ink)', strokeWidth: 1.2, strokeLinejoin: 'round' }}
+              style={segmentStyle(dayPhase(mark))}
               className={pickable ? 'cy-ring__seg' : undefined}
               role={pickable ? 'button' : undefined}
               tabIndex={pickable ? 0 : undefined}
@@ -99,18 +111,40 @@ export function CycleRing({
         })}
         {todayIndex >= 0 &&
           (() => {
+            // Aujourd'hui : contour épais et petite flèche à l'extérieur de l'anneau.
             const a0 = -90 + todayIndex * step + gap / 2;
-            const [x, y] = polar(OUTER + 11, -90 + (todayIndex + 0.5) * step);
+            const mid = -90 + (todayIndex + 0.5) * step;
+            const [tx, ty] = polar(OUTER + 4, mid);
+            const [lx, ly] = polar(OUTER + 14, mid - 4);
+            const [rx, ry] = polar(OUTER + 14, mid + 4);
             return (
               <g aria-hidden="true" style={{ pointerEvents: 'none' }}>
                 <path
                   d={sector(a0, a0 + step - gap)}
-                  style={{ fill: 'none', stroke: 'var(--ink)', strokeWidth: 3, strokeLinejoin: 'round' }}
+                  style={{ fill: 'none', stroke: 'var(--ink)', strokeWidth: 3.5, strokeLinejoin: 'round' }}
                 />
-                <circle cx={x} cy={y} r={6.5} style={{ fill: 'var(--pop)', stroke: 'var(--ink)', strokeWidth: 1.5 }} />
+                <path
+                  d={`M${tx.toFixed(2)} ${ty.toFixed(2)}L${lx.toFixed(2)} ${ly.toFixed(2)}L${rx.toFixed(2)} ${ry.toFixed(2)}Z`}
+                  style={{ fill: 'var(--ink)', stroke: 'var(--ink)', strokeWidth: 1.5, strokeLinejoin: 'round' }}
+                />
               </g>
             );
           })()}
+        {/* Ovulation estimée : pastille bleu soutenu au milieu du segment (par-dessus le contour du jour). */}
+        {days.map((date, i) => {
+          if (!date || dayPhase(marks.get(date)) !== 'ovulation') return null;
+          const [x, y] = polar((OUTER + INNER) / 2, -90 + (i + 0.5) * step);
+          return (
+            <circle
+              key={`o${i}`}
+              cx={x}
+              cy={y}
+              r={Math.min(6.5, ((OUTER + INNER) / 2) * ((step - gap) * Math.PI) / 360 - 1)}
+              style={{ fill: 'var(--cy-fertile)', stroke: 'var(--ink)', strokeWidth: 1.5, pointerEvents: 'none' }}
+              aria-hidden="true"
+            />
+          );
+        })}
       </svg>
       <div className="cy-ring__center">{children}</div>
     </div>

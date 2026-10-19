@@ -1,16 +1,17 @@
 /* Mode Cycle : anneau du cycle, calendrier, analyse, saisie du jour (DA « Trait fin »). */
 
 :root {
-  --cy-period: #d7263d;
+  /* Code couleur des phases, commun à l'anneau, aux calendriers et à la légende. */
+  --cy-period: #d7263d; /* règles notées : rouge franc, texte blanc */
   --cy-period-soft: #f9b4bf;
   --cy-period-ink: #7a0f1f;
-  --cy-fertile: #1595a8;
-  --cy-fertile-soft: #bfe9ef;
+  --cy-predicted: #e4dcde; /* règles prévues : rouge désaturé, trait pointillé */
+  --cy-fertile: #1f63c6; /* ovulation estimée : pastille bleu soutenu */
+  --cy-fertile-soft: #b9d6f5; /* fenêtre fertile : bleu clair */
   --cy-pms: #7a4bd6;
-  --cy-pms-soft: #ddd0fb;
-  /* Jours passés et à venir sans marque, sur l'anneau. */
+  --cy-pms-soft: #e4cdf3; /* SPM : mauve pastel */
+  /* Barres neutres des analyses. */
   --cy-past: #f6dbe5;
-  --cy-future: #ffffff;
 }
 
 /* --- Onglets Cycle / Calendrier / Analyse --------------------------------- */
@@ -125,10 +126,27 @@
 }
 
 .cy-swatch {
-  width: 13px;
-  height: 13px;
+  position: relative;
+  width: 16px;
+  height: 16px;
   border: 1.5px solid var(--ink);
-  border-radius: 4px;
+  border-radius: 5px;
+  background: var(--card);
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+
+.cy-swatch--today {
+  border-width: 3px;
+}
+
+/* Repères (jour noté, spotting) dans la légende : même taille qu'une case. */
+.cy-legend__mark {
+  width: 16px;
+  height: 16px;
+  display: grid;
+  place-items: center;
   flex: none;
 }
 
@@ -193,6 +211,7 @@
 }
 
 .cy-strip button {
+  position: relative;
   min-width: 0;
   height: 72px;
   padding: 6px 0;
@@ -210,75 +229,80 @@
 
 .cy-strip button:disabled {
   cursor: default;
+}
+
+/* Jours à venir sans phase : sans case. */
+.cy-strip button:disabled:not(.cy-day) {
   border-color: transparent;
   background: transparent;
 }
 
 .cy-strip button[aria-current='date'] {
-  background: var(--picked);
+  border-width: 3px;
   color: var(--ink);
 }
 
-/* --- Pastille d'un jour (bande, calendrier) --------------------------------- */
 
-.cy-num {
-  width: 30px;
-  height: 30px;
-  border: 1.5px solid transparent;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  font-family: var(--font-display);
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--ink);
-}
+/* --- Phase d'un jour (bande, calendriers, légende) ------------------------- */
 
-.cy-num--period {
-  border-color: var(--ink);
+/* La case entière prend la couleur de la phase (double classe : passe avant le fond des cases). */
+.cy-day.cy-day--period {
   background: var(--cy-period);
   color: #fff;
 }
 
-.cy-num--predicted {
-  border: 1.5px dashed var(--cy-period);
-  background: var(--cy-period-soft);
-  color: var(--cy-period-ink);
+.cy-day.cy-day--predicted {
+  border-style: dashed;
+  border-color: var(--cy-period);
+  background: var(--cy-predicted);
+  color: var(--ink);
 }
 
-.cy-num--fertile {
-  border-color: var(--ink);
+.cy-day.cy-day--fertile {
   background: var(--cy-fertile-soft);
-  color: #073f48;
+  color: var(--ink);
 }
 
-.cy-num--ovulation {
-  border-color: var(--ink);
-  background: var(--cy-fertile);
-  color: #fff;
-}
-
-.cy-num--pms {
-  border-color: var(--ink);
+.cy-day.cy-day--pms {
   background: var(--cy-pms-soft);
-  color: #2e1660;
+  color: var(--ink);
 }
 
-.cy-num--spotting {
-  border: 2px solid var(--cy-period);
+/* Ovulation estimée : pastille bleu soutenu dans le coin de la case. */
+.cy-ovu {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 10px;
+  height: 10px;
+  border: 1.5px solid var(--ink);
+  border-radius: 50%;
+  background: var(--cy-fertile);
 }
 
-/* Aujourd'hui : touche jaune quand le jour n'a pas d'autre couleur, sinon un anneau. */
-.cy-num--today {
-  box-shadow:
-    0 0 0 2px var(--card),
-    0 0 0 3.5px var(--ink);
+.cy-swatch .cy-ovu {
+  position: static;
+  width: 8px;
+  height: 8px;
+  border-width: 1px;
 }
 
-.cy-num--today.cy-num--plain {
-  border-color: var(--ink);
-  background: var(--pop);
-  box-shadow: none;
+.cy-num {
+  height: 26px;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+  color: inherit;
+}
+
+/* Repères discrets sous le numéro : spotting, jour noté. */
+.cy-marks {
+  height: 6px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
 }
 
 .cy-logdot {
@@ -288,8 +312,15 @@
   background: var(--muted);
 }
 
-.cy-logdot--none {
-  background: transparent;
+.cy-day--period .cy-logdot {
+  background: #fff;
+}
+
+.cy-spot {
+  width: 10px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--cy-period);
 }
 
 /* --- Cartes ------------------------------------------------------------------ */
@@ -409,16 +440,18 @@
 }
 
 .cy-month__cell {
+  position: relative;
   min-width: 0;
   height: 54px;
-  padding: 4px 0 0;
+  padding: 6px 0 0;
   border: var(--stroke);
   border-radius: 14px;
   background: var(--card);
+  color: var(--ink);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 3px;
+  gap: 4px;
 }
 
 .cy-month__cell--outside {
@@ -427,8 +460,21 @@
   opacity: 0.5;
 }
 
+/* Aujourd'hui : contour prononcé (le padding compense l'épaisseur). */
+.cy-month__cell--today {
+  padding-top: 4.5px;
+  border-width: 3px;
+}
+
+.cy-month__cell--today .cy-ovu {
+  top: 2.5px;
+  right: 2.5px;
+}
+
+/* Jour choisi : anneau framboise autour de la case, quelle que soit sa couleur. */
 .cy-month__cell[aria-pressed='true'] {
-  background: var(--picked);
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 /* --- Saisie du jour ---------------------------------------------------------- */
@@ -748,20 +794,6 @@
   font-size: 14px;
   font-weight: 700;
   color: var(--danger);
-}
-
-/* Règles dans le mode Calendrier (réglage « Règles dans le Calendrier »). */
-.month__period {
-  width: 16px;
-  height: 4px;
-  border-radius: 2px;
-  background: var(--cy-period);
-}
-
-.month__period--predicted {
-  height: 3px;
-  background: var(--cy-period-soft);
-  outline: 1px dashed var(--cy-period);
 }
 
 /* --- Analyses détaillées ------------------------------------------------------- */

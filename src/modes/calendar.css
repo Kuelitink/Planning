@@ -47,6 +47,28 @@
   font-weight: 500;
 }
 
+/* Phase du cycle du jour affiché (vue Jour). */
+.cal-cycle {
+  margin: -6px 0 18px 48px;
+}
+
+.cal-cycle__tag {
+  position: relative;
+  min-height: 28px;
+  padding: 0 12px;
+  border: var(--stroke);
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.cal-cycle__tag .cy-ovu {
+  position: static;
+}
+
 .cal {
   position: relative;
   margin-top: 8px;
@@ -235,6 +257,30 @@
   gap: 2px;
 }
 
+/* Phase du cycle : fond teinté de l'en-tête du jour (pas de la grille horaire). */
+.week__day.cy-day {
+  position: relative;
+  margin: 0 1px;
+  border: var(--stroke);
+  border-radius: 12px;
+}
+
+.week__day.cy-day--predicted {
+  border-style: dashed;
+  border-color: var(--cy-period);
+}
+
+.week__day.cy-day .week__dow {
+  color: inherit;
+}
+
+.week__day .cy-ovu {
+  top: 3px;
+  right: 3px;
+  width: 8px;
+  height: 8px;
+}
+
 .week__dow {
   font-size: 11px;
   font-weight: 700;
@@ -253,12 +299,6 @@
 }
 
 .week__num--today,
-.month__num--today {
-  border: var(--stroke);
-  background: var(--pop);
-  color: var(--ink);
-}
-
 .week__allday {
   margin-bottom: 4px;
 }
@@ -395,6 +435,7 @@
 }
 
 .month__cell {
+  position: relative;
   min-width: 0;
   height: 56px;
   padding: 5px 0 0;
@@ -407,14 +448,44 @@
   gap: 4px;
 }
 
+/* Aujourd'hui : contour prononcé (le padding compense l'épaisseur), sans pastille jaune. */
+.month__cell--today {
+  padding-top: 3.5px;
+  border-width: 3px;
+}
+
+.month__cell--today .cy-ovu {
+  top: 2.5px;
+  right: 2.5px;
+}
+
 .month__cell--outside {
   border-color: transparent;
   background: transparent;
   color: var(--faint);
 }
 
-.month__cell--selected {
+.month__cell--selected:not(.cy-day) {
   background: var(--picked);
+}
+
+/* Jour choisi sur une case colorée par le cycle : anneau framboise autour de la case. */
+.month__cell--selected.cy-day {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* Phases du cycle : les points des tâches gardent un liseré blanc pour rester lisibles. */
+.month__cell.cy-day .month__dot {
+  box-shadow: 0 0 0 1.5px var(--card);
+}
+
+.month__cell.cy-day .month__more {
+  color: var(--ink);
+}
+
+.month__cell.cy-day--period .month__more {
+  color: #fff;
 }
 
 .month__num {

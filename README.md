@@ -13,6 +13,14 @@ L'app fonctionne par **modes**, choisis dans le menu en haut à gauche : Calendr
 Checklist (to-do du jour auto-planifiée), Listes, Objectifs, Chrono, Cycle, et Réglages. Les détails
 d'une tâche (priorité, échéance, dépendances, horaires, découpage) sont dans sa fiche.
 
+**Auto-planification** : les tâches à faire sont placées au plus tôt dans les créneaux libres,
+la plus urgente d'abord (échéance, priorité, dépendances), et replacées à chaque modification.
+Avec des données de cycle, la charge s'adapte au cycle (Réglages › Planification › « Adapter la
+charge au cycle », actif par défaut) : journées pleines en phases folliculaire et ovulatoire, de
+plus en plus légères en phase lutéale (85 % du temps libre au début, 50 % la veille des règles),
+70 % pendant les règles. Ce plafond cède toujours devant une échéance ou un manque de place :
+le cycle ne crée jamais de retard.
+
 ## Commandes
 
 ```bash
@@ -34,6 +42,7 @@ cd android && ./gradlew testDebugUnitTest     # tests des widgets (images dans a
 - `src/core/` — logique pure, sans interface :
   - `types.ts` modèle de données (listes, horaires, tâches, événements, objectifs, chrono, réglages) ;
   - `scheduler.ts` auto-planification (règles et score d'urgence documentés en tête du fichier) ;
+    `cycleLoad.ts` charge de chaque jour selon le cycle ;
   - `daily.ts` to-do du jour et totaux ; `goals.ts` objectifs ; `timer.ts` chrono ;
   - `time.ts`, `intervals.ts`, `windows.ts`, `events.ts` utilitaires (heure locale, récurrences) ;
   - `cycle.ts` cycles, moyennes et prédictions (règles de calcul en tête du fichier) ;
@@ -60,6 +69,13 @@ Suivi du cycle menstruel inspiré de Clue :
   les rappels du jour, la semaine, ce qui est noté aujourd'hui et les prédictions (prochaines
   règles avec fourchette, fenêtre fertile, ovulation, SPM, retard).
 - **Calendrier** : règles notées et prévues, fenêtres fertiles, SPM et jours notés, mois par mois.
+  Chaque case prend la couleur de sa phase : rouge pour les règles notées, rouge désaturé en
+  pointillé pour les règles prévues, bleu clair pour la fenêtre fertile (avec une pastille bleu
+  soutenu le jour de l'ovulation estimée), mauve pastel pour le SPM ; aujourd'hui a un contour
+  épais. L'anneau et la légende reprennent exactement ce code couleur.
+- **Phases du cycle dans le Calendrier** (réglage du cycle, activé par défaut) : le mode
+  Calendrier teinte les cases du mois avec ces mêmes couleurs (les points des tâches restent
+  visibles) et marque les en-têtes des jours en vues Semaine et Jour.
 - **Analyse** : cycle et règles moyens, variation (régularité), historique filtrable (exclure un
   cycle des prédictions, l'annoter), tendances des symptômes par jour du cycle, et des analyses
   détaillées façon Clue Plus :

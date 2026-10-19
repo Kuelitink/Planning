@@ -397,7 +397,8 @@ export const DEFAULT_CYCLE_SETTINGS: CycleSettings = {
   remindPms: false,
   remindFertile: false,
   notify: false,
-  onCalendar: false,
+  onCalendar: true,
+  adaptLoad: true,
 };
 
 /** Réglages du cycle complétés par les valeurs par défaut. */

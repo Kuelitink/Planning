@@ -19,7 +19,22 @@ import { CycleRing } from './cycle/CycleRing';
 import { CycleCalendar } from './cycle/CycleCalendar';
 import { CycleAnalysis } from './cycle/CycleAnalysis';
 import { PHASE_INFO, historyPhase } from './cycle/phaseInfo';
-import { DayChips, Legend, WEEKDAY_LETTER, dayMonth, formatRange, numClass, phaseLabel, plural, relativeDays } from './cycle/shared';
+import {
+  DayChips,
+  DayMarks,
+  Legend,
+  OvulationDot,
+  PhaseSwatch,
+  WEEKDAY_LETTER,
+  dayMonth,
+  dayPhase,
+  describeMark,
+  formatRange,
+  phaseClass,
+  phaseLabel,
+  plural,
+  relativeDays,
+} from './cycle/shared';
 import './cycle.css';
 
 type View = 'cycle' | 'calendar' | 'analysis';
@@ -135,7 +150,7 @@ function CycleToday() {
           </>
         )}
       </CycleRing>
-      {hasData && <Legend settings={settings} />}
+      {hasData && <Legend settings={settings} variant="ring" />}
 
       {!hasData && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 20 }}>
@@ -170,19 +185,22 @@ function CycleToday() {
           {Array.from({ length: 7 }, (_, i) => addDaysISO(today, i - 3)).map((date) => {
             const d = parseISODate(date);
             const mark = marks.get(date);
+            const phase = dayPhase(mark);
             const future = date > today;
             return (
               <button
                 key={date}
                 type="button"
+                className={phaseClass(phase) || undefined}
                 disabled={future}
                 aria-current={date === today ? 'date' : undefined}
-                aria-label={`${dayMonth(date)}${mark?.cycleDay ? `, jour ${mark.cycleDay}` : ''}${future ? '' : ' — noter'}`}
+                aria-label={`${dayMonth(date)}${describeMark(mark, future) ? `, ${describeMark(mark, future)}` : ''}${future ? '' : ' — noter'}`}
                 onClick={() => openDay(date)}
               >
                 <span>{WEEKDAY_LETTER[d.getDay()]}</span>
-                <span className={numClass(mark, false)}>{d.getDate()}</span>
-                <span className={mark?.logged ? 'cy-logdot' : 'cy-logdot cy-logdot--none'} />
+                <span className="cy-num">{d.getDate()}</span>
+                {phase === 'ovulation' && <OvulationDot />}
+                <DayMarks mark={mark} />
               </button>
             );
           })}
@@ -216,7 +234,7 @@ function CycleToday() {
           <h2 className="section-label">Prédictions</h2>
           <div className="cy-card" style={{ padding: '4px 16px' }}>
             <div className="cy-pred">
-              <span className="cy-swatch" style={{ background: 'var(--cy-period)' }} aria-hidden="true" />
+              <PhaseSwatch phase="predicted" />
               <span className="cy-pred__label">Prochaines règles</span>
               <span className="cy-pred__value">
                 {fc.lateDays > 0 ? `Attendues le ${dayMonth(addDaysISO(fc.nextPeriod, -fc.lateDays))}` : dayMonth(fc.nextPeriod)}
@@ -232,7 +250,7 @@ function CycleToday() {
             </div>
             {settings.showFertile && nextFertile && (
               <div className="cy-pred">
-                <span className="cy-swatch" style={{ background: 'var(--cy-fertile-soft)' }} aria-hidden="true" />
+                <PhaseSwatch phase="fertile" />
                 <span className="cy-pred__label">Fenêtre fertile</span>
                 <span className="cy-pred__value">
                   {formatRange(nextFertile[0], nextFertile[1])}
@@ -242,7 +260,7 @@ function CycleToday() {
             )}
             {settings.showOvulation && nextOvulation && (
               <div className="cy-pred">
-                <span className="cy-swatch" style={{ background: 'var(--cy-fertile)' }} aria-hidden="true" />
+                <PhaseSwatch phase="ovulation" />
                 <span className="cy-pred__label">Ovulation</span>
                 <span className="cy-pred__value">
                   {dayMonth(nextOvulation)}
@@ -262,7 +280,7 @@ function CycleToday() {
             )}
             {settings.showPms && nextPms && (
               <div className="cy-pred">
-                <span className="cy-swatch" style={{ background: 'var(--cy-pms-soft)' }} aria-hidden="true" />
+                <PhaseSwatch phase="pms" />
                 <span className="cy-pred__label">SPM</span>
                 <span className="cy-pred__value">
                   {formatRange(nextPms[0], nextPms[1])}
