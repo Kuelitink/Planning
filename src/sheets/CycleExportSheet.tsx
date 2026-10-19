@@ -41,7 +41,7 @@ export function CycleExportSheet({ onClose }: { onClose: () => void }) {
       const { zip, jsons } = build();
       const files = canShareFiles([zip]) ? [zip] : canShareFiles(jsons) ? jsons : null;
       if (!files) {
-        downloadFile(zip);
+        await downloadFile(zip);
         showToast({ message: 'Partage indisponible ici : export téléchargé' });
       } else if (await shareFiles(files, 'Données du cycle (format Clue)')) showToast({ message: 'Export envoyé' });
     } catch (err) {
@@ -52,10 +52,9 @@ export function CycleExportSheet({ onClose }: { onClose: () => void }) {
     }
   };
 
-  const download = () => {
+  const download = async () => {
     try {
-      downloadFile(build().zip);
-      showToast({ message: 'Export téléchargé' });
+      showToast({ message: await downloadFile(build().zip) });
     } catch (err) {
       console.error(err);
       showToast({ message: "L'export a échoué." });
@@ -86,7 +85,7 @@ export function CycleExportSheet({ onClose }: { onClose: () => void }) {
           <IconUpload size={18} />
           Enregistrer sur Drive ou partager
         </button>
-        <button type="button" className="btn btn--secondary btn--block" disabled={empty} onClick={download}>
+        <button type="button" className="btn btn--secondary btn--block" disabled={empty} onClick={() => void download()}>
           Télécharger le .zip
         </button>
       </div>

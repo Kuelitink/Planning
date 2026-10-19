@@ -1,6 +1,6 @@
 /** Réglages : modes affichés, horaires, planification, sauvegarde des données. */
 
-import { useId, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { toISODate } from '../core/time';
 import { parseExport } from '../storage/repository';
 import { canShareFiles, downloadFile, shareFiles } from '../ui/share';
@@ -12,6 +12,8 @@ import { Field, Header, MODE_ICON } from '../ui/kit';
 import { IconChevronRight, IconPlus } from '../ui/icons';
 import { summarizeRules } from '../sheets/RangesEditor';
 import { formatPeriodDates, PeriodSheet, summarizePeriod, upcomingPeriods } from '../sheets/PeriodSheet';
+import { BUILD_NUMBER, isNative } from '../native/platform';
+import { latestApk, RELEASES_PAGE, type ApkRelease } from '../native/update';
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -21,6 +23,39 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
         {children}
       </div>
     </section>
+  );
+}
+
+/** Version ; dans l'appli Android, lien vers la nouvelle APK s'il y en a une, sinon lien vers l'APK. */
+function AppVersion() {
+  const [update, setUpdate] = useState<ApkRelease | null>(null);
+  useEffect(() => {
+    if (!isNative || !BUILD_NUMBER) return;
+    let cancelled = false;
+    void latestApk().then((r) => !cancelled && r && r.build > BUILD_NUMBER && setUpdate(r));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  const linkStyle = { color: 'var(--accent-text)', fontWeight: 700 } as const;
+  return (
+    <div style={{ margin: '32px 0 0', textAlign: 'center', fontSize: 13, color: 'var(--faint)', lineHeight: 1.6 }}>
+      <p style={{ margin: 0 }}>Planning — v0.3{isNative && BUILD_NUMBER ? ` · appli Android n°${BUILD_NUMBER}` : ''}</p>
+      {update && (
+        <p style={{ margin: 0 }}>
+          <a href={update.url} target="_blank" rel="noopener" style={linkStyle}>
+            Nouvelle version (n°{update.build}) : télécharger l’APK
+          </a>
+        </p>
+      )}
+      {!isNative && (
+        <p style={{ margin: 0 }}>
+          <a href={RELEASES_PAGE} target="_blank" rel="noopener" style={linkStyle}>
+            Appli Android avec widgets (APK)
+          </a>
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -89,8 +124,7 @@ export function SettingsMode() {
 
   const doExport = async () => {
     try {
-      downloadFile(await exportFile());
-      showToast({ message: 'Export téléchargé' });
+      showToast({ message: await downloadFile(await exportFile()) });
     } catch (err) {
       console.error(err);
       showToast({ message: "L'export a échoué." });
@@ -102,7 +136,7 @@ export function SettingsMode() {
     try {
       const file = await exportFile();
       if (!canShareFiles([file])) {
-        downloadFile(file);
+        await downloadFile(file);
         showToast({ message: 'Partage indisponible ici : export téléchargé' });
       } else if (await shareFiles([file], 'Sauvegarde Planning')) showToast({ message: 'Sauvegarde envoyée' });
     } catch (err) {
@@ -278,7 +312,7 @@ export function SettingsMode() {
         </div>
       </Section>
 
-      <p style={{ margin: '32px 0 0', textAlign: 'center', fontSize: 13, color: 'var(--faint)' }}>Planning — v0.3</p>
+      <AppVersion />
       {period && <PeriodSheet key={period.id ?? 'new'} periodId={period.id} onClose={() => setPeriod(null)} />}
     </>
   );

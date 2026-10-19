@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Widget « Prochaine tâche » : ce qui est en cours ou juste après, avec sa case. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_bg"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingStart="16dp"
+    android:paddingTop="10dp"
+    android:paddingEnd="6dp"
+    android:paddingBottom="10dp">
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/label"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:letterSpacing="0.06"
+            android:maxLines="1"
+            android:text="@string/widget_now"
+            android:textColor="@color/planning_accent"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:fontFamily="sans-serif-medium"
+            android:maxLines="2"
+            android:text="@string/widget_next_label"
+            android:textColor="@color/planning_ink"
+            android:textSize="17sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/meta"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="@color/planning_muted"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <FrameLayout
+        android:id="@+id/check_area"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:contentDescription="@string/widget_check"
+        android:visibility="gone">
+
+        <ImageView
+            android:id="@+id/check_box"
+            android:layout_width="26dp"
+            android:layout_height="26dp"
+            android:layout_gravity="center"
+            android:importantForAccessibility="no"
+            android:src="@drawable/widget_box_off" />
+
+        <ImageView
+            android:id="@+id/check_tick"
+            android:layout_width="26dp"
+            android:layout_height="26dp"
+            android:layout_gravity="center"
+            android:importantForAccessibility="no"
+            android:src="@drawable/widget_tick"
+            android:visibility="gone" />
+    </FrameLayout>
+</LinearLayout>

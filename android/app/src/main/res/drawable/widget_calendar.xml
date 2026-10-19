@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Marque des événements (à la place de la case). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="22dp"
+    android:height="22dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:pathData="M5,6.5 h14 a1.5,1.5 0 0 1 1.5,1.5 v10.5 a1.5,1.5 0 0 1 -1.5,1.5 h-14 a1.5,1.5 0 0 1 -1.5,-1.5 v-10.5 a1.5,1.5 0 0 1 1.5,-1.5 z M3.5,10.5 h17 M8,4 v4 M16,4 v4"
+        android:strokeWidth="1.8"
+        android:strokeColor="@color/planning_muted"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+</vector>

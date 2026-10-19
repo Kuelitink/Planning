@@ -23,6 +23,8 @@ import { CycleExportSheet } from './sheets/CycleExportSheet';
 import { GitHubSyncSheet } from './sheets/GitHubSyncSheet';
 import { SyncProvider } from './state/sync';
 import { useCycleNotifications } from './state/cycle';
+import { isNative } from './native/platform';
+import { NativeBridge } from './native/NativeBridge';
 
 function CurrentMode() {
   const { mode } = useNav();
@@ -95,6 +97,7 @@ function Shell() {
       <CurrentSheet />
       <ToastView />
       <CycleNotifications />
+      {isNative && <NativeBridge />}
     </>
   );
 }
