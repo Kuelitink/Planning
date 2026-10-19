@@ -30,6 +30,10 @@ export class MemoryRepository implements Repository {
     this.data.get(collection)!.set(item.id, structuredClone(item));
   }
 
+  async putMany<K extends CollectionName>(collection: K, items: Collections[K][]): Promise<void> {
+    for (const item of items) await this.put(collection, item);
+  }
+
   async remove(collection: CollectionName, id: ID): Promise<void> {
     this.data.get(collection)!.delete(id);
   }

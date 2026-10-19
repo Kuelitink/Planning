@@ -19,6 +19,8 @@ const data = (overrides: Partial<AppData>): AppData => ({
   events: [],
   goals: [],
   timeEntries: [],
+  cycleDays: [],
+  cycleMarks: [],
   settings: settings(),
   ...overrides,
 });

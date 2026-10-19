@@ -132,6 +132,21 @@ export const IconTrash = (p: P) => (
     <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" />
   </Svg>
 );
+export const IconDrop = (p: P) => (
+  <Svg {...p}>
+    <path d="M12 2.7 6.3 8.4a8 8 0 1 0 11.4 0z" />
+  </Svg>
+);
+export const IconBell = (p: P) => (
+  <Svg {...p}>
+    <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+  </Svg>
+);
+export const IconUpload = (p: P) => (
+  <Svg {...p}>
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" />
+  </Svg>
+);
 export const IconPin = (p: P) => (
   <Svg {...p}>
     <path d="M12 17v5M9 3h6l-1 7 4 4H6l4-4-1-7z" />

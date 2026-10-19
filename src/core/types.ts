@@ -137,6 +137,62 @@ export interface TimeEntry extends Entity {
   end?: ISODateTime;
 }
 
+/** Intensité des règles, comme dans Clue. */
+export type Flow = 'light' | 'medium' | 'heavy' | 'very_heavy';
+
+/**
+ * Ce qui a été noté un jour dans le mode Cycle : règles, symptômes, mesures.
+ * Un seul enregistrement par jour : l'identifiant est la date.
+ */
+export interface CycleDay extends Entity {
+  date: ISODate;
+  /** Règles ce jour-là (le spotting est une catégorie à part, qui ne démarre pas de cycle). */
+  flow?: Flow;
+  /** Options notées par catégorie (`{ pain: ['period_cramps'], tags: ['voyage'] }`), clés au format Clue. */
+  options: Record<string, string[]>;
+  /** Intensité d'une option notée (douleurs), par clé `catégorie.option` : `mild`, `moderate`, `severe`… */
+  severity?: Record<string, string>;
+  /** Durée de sommeil, en minutes. */
+  sleepMin?: number;
+  /** Température basale, en °C. */
+  bbt?: number;
+  weightKg?: number;
+  note?: string;
+}
+
+/** Annotation d'un cycle, repéré par son premier jour de règles (identifiant = cette date). */
+export interface CycleMark extends Entity {
+  startDate: ISODate;
+  /** Cycle ignoré par les prédictions et les moyennes (maladie, stress, oubli de saisie…). */
+  excluded: boolean;
+  note?: string;
+}
+
+export interface CycleSettings {
+  /** Durées utilisées tant que l'historique ne suffit pas pour les calculer. */
+  cycleLength: number;
+  periodLength: number;
+  /** Jours de SPM affichés avant les règles prévues. */
+  pmsDays: number;
+  showFertile: boolean;
+  showOvulation: boolean;
+  showPms: boolean;
+  /** Catégories proposées dans la saisie du jour, dans l'ordre. */
+  categories: string[];
+  /** Étiquettes perso (catégorie `tags`). */
+  customTags: string[];
+  /** Rappel N jours avant les règles prévues (0 = désactivé). */
+  remindPeriodDays: number;
+  remindPms: boolean;
+  remindFertile: boolean;
+  /** Rappel de saisie du jour à partir de cette heure (absent = désactivé). */
+  checkInTime?: HHMM;
+  /** Rappels aussi en notification du téléphone (quand l'app est ouverte). */
+  notify: boolean;
+  /** Règles (notées et prévues) visibles dans le mode Calendrier. */
+  onCalendar: boolean;
+}
+
 export interface Settings {
   /** Horaires par défaut ; absent = `dayStart`–`dayEnd` tous les jours. */
   defaultWindowId?: ID;
@@ -149,6 +205,8 @@ export interface Settings {
   weekStartsOn: 0 | 1;
   /** Marge laissée autour de chaque tâche et événement, en minutes. */
   bufferMin: number;
+  /** Réglages du mode Cycle (complétés par `DEFAULT_CYCLE_SETTINGS`). */
+  cycle?: Partial<CycleSettings>;
   updatedAt?: ISODateTime;
 }
 

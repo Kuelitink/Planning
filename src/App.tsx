@@ -7,12 +7,18 @@ import { ListsMode } from './modes/ListsMode';
 import { GoalsMode } from './modes/GoalsMode';
 import { ChronoMode } from './modes/ChronoMode';
 import { SettingsMode } from './modes/SettingsMode';
+import { CycleMode } from './modes/CycleMode';
 import { TaskSheet } from './sheets/TaskSheet';
 import { EventSheet } from './sheets/EventSheet';
 import { AddSheet } from './sheets/AddSheet';
 import { ProjectSheet } from './sheets/ProjectSheet';
 import { GoalPickSheet } from './sheets/GoalPickSheet';
 import { WindowSheet } from './sheets/WindowSheet';
+import { CycleDaySheet } from './sheets/CycleDaySheet';
+import { CycleSheet } from './sheets/CycleSheet';
+import { CycleSettingsSheet } from './sheets/CycleSettingsSheet';
+import { CycleImportSheet } from './sheets/CycleImportSheet';
+import { useCycleNotifications } from './state/cycle';
 
 function CurrentMode() {
   const { mode } = useNav();
@@ -27,6 +33,8 @@ function CurrentMode() {
       return <GoalsMode />;
     case 'chrono':
       return <ChronoMode />;
+    case 'cycle':
+      return <CycleMode />;
     case 'settings':
       return <SettingsMode />;
   }
@@ -48,7 +56,21 @@ function CurrentSheet() {
       return <GoalPickSheet period={sheet.period} periodStart={sheet.periodStart} onClose={closeSheet} />;
     case 'window':
       return <WindowSheet key={sheet.id ?? 'new'} id={sheet.id} onClose={closeSheet} />;
+    case 'cycleDay':
+      return <CycleDaySheet key={sheet.date} date={sheet.date} onClose={closeSheet} />;
+    case 'cycle':
+      return <CycleSheet key={sheet.start} start={sheet.start} onClose={closeSheet} />;
+    case 'cycleSettings':
+      return <CycleSettingsSheet onClose={closeSheet} />;
+    case 'cycleImport':
+      return <CycleImportSheet onClose={closeSheet} />;
   }
+}
+
+/** Rappels du cycle en notification (si permis), même hors de l'onglet Cycle. */
+function CycleNotifications() {
+  useCycleNotifications();
+  return null;
 }
 
 function Shell() {
@@ -62,6 +84,7 @@ function Shell() {
       <ModeMenu />
       <CurrentSheet />
       <ToastView />
+      <CycleNotifications />
     </>
   );
 }

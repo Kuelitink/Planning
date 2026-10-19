@@ -1,0 +1,1 @@
+{"Notifications":[{"Type":"reminder_daily_check_in","Enabled":true,"Reminder":{"TimeOfDay":"21:00","TimeZone":"Europe/Paris"}},{"Type":"reminder_period_coming_soon","Enabled":true,"Reminder":{"TimeOfDay":"09:00"}}]}
