@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- DA « Trait fin » (src/ui/theme.css) : fond rose pâle, cartes blanches, fin trait prune. -->
+<resources>
+    <color name="planning_bg">#FFEAF1</color>
+    <color name="planning_card">#FFFFFF</color>
+    <color name="planning_line">#F2C6D6</color>
+    <color name="planning_ink">#3A0F24</color>
+    <color name="planning_muted">#8A4D66</color>
+    <color name="planning_faint">#B98AA0</color>
+    <color name="planning_accent">#A3124C</color>
+    <color name="planning_pop">#FFE14D</color>
+</resources>

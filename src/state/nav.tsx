@@ -3,10 +3,10 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { GoalPeriod, ID, ISODate, Task } from '../core/types';
 
-export type Mode = 'calendar' | 'checklist' | 'lists' | 'goals' | 'chrono' | 'settings';
+export type Mode = 'calendar' | 'checklist' | 'lists' | 'goals' | 'chrono' | 'cycle' | 'settings';
 
 /** Modes proposés dans le menu, dans l'ordre (les réglages sont toujours accessibles). */
-export const MODES: Exclude<Mode, 'settings'>[] = ['calendar', 'checklist', 'lists', 'goals', 'chrono'];
+export const MODES: Exclude<Mode, 'settings'>[] = ['calendar', 'checklist', 'lists', 'goals', 'chrono', 'cycle'];
 
 export const MODE_LABEL: Record<Mode, string> = {
   calendar: 'Calendrier',
@@ -14,8 +14,12 @@ export const MODE_LABEL: Record<Mode, string> = {
   lists: 'Listes',
   goals: 'Objectifs',
   chrono: 'Chrono',
+  cycle: 'Cycle',
   settings: 'Réglages',
 };
+
+/** Analyses détaillées du mode Cycle. */
+export type InsightTopic = 'length' | 'flow' | 'pain' | 'mood' | 'sleep' | 'bbt';
 
 export type SheetState =
   | { kind: 'task'; id?: ID; defaults?: Partial<Task> }
@@ -25,7 +29,16 @@ export type SheetState =
   | { kind: 'goalPick'; period: GoalPeriod; periodStart: ISODate }
   | { kind: 'window'; id?: ID }
   /** Choix « Tâche ou événement ? » depuis le bouton + du calendrier. */
-  | { kind: 'add'; date?: Date };
+  | { kind: 'add'; date?: Date }
+  /** Mode Cycle : saisie d'un jour, détail d'un cycle, réglages, import Clue. */
+  | { kind: 'cycleDay'; date: ISODate }
+  | { kind: 'cycle'; start: ISODate }
+  | { kind: 'cycleInsight'; topic: InsightTopic }
+  | { kind: 'cycleSettings' }
+  | { kind: 'cycleImport' }
+  | { kind: 'cycleExport' }
+  /** Sauvegarde chiffrée sur GitHub. */
+  | { kind: 'githubSync' };
 
 export interface Toast {
   message: string;
@@ -51,6 +64,9 @@ export interface Nav {
 
 const MODE_KEY = 'planning.mode';
 const VISIBLE_KEY = 'planning.visibleModes';
+/** Modes connus lors du dernier lancement : un mode ajouté depuis s'affiche d'office. */
+const KNOWN_KEY = 'planning.knownModes';
+const MODES_BEFORE_CYCLE: Mode[] = ['calendar', 'checklist', 'lists', 'goals', 'chrono'];
 
 function readStorage<T>(key: string, fallback: T): T {
   try {
@@ -80,7 +96,11 @@ export function useNav(): Nav {
 export function NavProvider({ children }: { children: ReactNode }) {
   const [visibleModes, setVisibleState] = useState<Mode[]>(() => {
     const saved = readStorage<Mode[]>(VISIBLE_KEY, MODES);
-    const valid = saved.filter((m) => (MODES as Mode[]).includes(m));
+    const known = readStorage<Mode[]>(KNOWN_KEY, MODES_BEFORE_CYCLE);
+    const added = MODES.filter((m) => !known.includes(m));
+    writeStorage(KNOWN_KEY, MODES);
+    const valid = MODES.filter((m) => saved.includes(m) || added.includes(m));
+    if (added.length) writeStorage(VISIBLE_KEY, valid);
     return valid.length ? valid : MODES;
   });
   const [mode, setModeState] = useState<Mode>(() => {

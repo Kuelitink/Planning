@@ -2,6 +2,8 @@
 
 import { useMemo } from 'react';
 import { addDays, formatHM, isSameDay, startOfMonth, startOfWeek, toISODate } from '../../core/time';
+import { dayMarks } from '../../core/cycle';
+import { useCycle } from '../../state/cycle';
 import { useStore } from '../../state/store';
 import { useNav } from '../../state/nav';
 import { useNow } from '../../ui/kit';
@@ -10,10 +12,11 @@ import { formatDayLong } from '../../ui/format';
 import { toneOf } from '../../ui/palette';
 import { itemsByDay, type MonthItem } from './shared';
 import { WEEKDAY_INITIAL } from './WeekView';
+import '../cycle.css';
 
 /** Points affichés au plus par cellule (au-delà : « +n »). */
 const MAX_DOTS = 4;
-const EVENT_DOT = '#9AA1AD';
+const EVENT_DOT = '#B98AA0';
 
 /** Avec « +n », on garde la place d'un point pour le compteur. */
 const shownDots = (n: number) => (n > MAX_DOTS ? MAX_DOTS - 1 : n);
@@ -47,6 +50,14 @@ export function MonthView({
     return { days: list, byDay: itemsByDay(plan, tasks, events, gridStart, addDays(gridStart, weeks * 7)) };
   }, [monthKey, settings.weekStartsOn, plan, tasks, events]);
 
+  // Règles notées et prévues, si on a choisi de les voir ici (réglages du cycle).
+  const cycle = useCycle();
+  const periods = useMemo(() => {
+    if (!cycle.settings.onCalendar || !days.length) return null;
+    const marks = dayMarks([...cycle.byDate.values()], cycle.forecast, cycle.settings, toISODate(days[0]), toISODate(days[days.length - 1]), cycle.today);
+    return new Map([...marks].filter(([, m]) => m.period).map(([d, m]) => [d, m.period]));
+  }, [cycle.settings, cycle.byDate, cycle.forecast, cycle.today, days]);
+
   const colorOf = (projectId?: string) => toneOf(projects.find((p) => p.id === projectId)?.color).dot;
   const dotColor = (item: MonthItem) => (item.kind === 'task' ? colorOf(item.projectId) : EVENT_DOT);
   const weekdayOrder = Array.from({ length: 7 }, (_, i) => (settings.weekStartsOn + i) % 7);
@@ -73,10 +84,13 @@ export function MonthView({
               type="button"
               className={cls}
               aria-pressed={isSelected}
-              aria-label={`${formatDayLong(day)}, ${countLabel(items.length)}`}
+              aria-label={`${formatDayLong(day)}, ${countLabel(items.length)}${periods?.has(toISODate(day)) ? ', règles' : ''}`}
               onClick={() => onSelect(day)}
             >
               <span className={today ? 'month__num month__num--today' : 'month__num'}>{day.getDate()}</span>
+              {periods?.has(toISODate(day)) && (
+                <span className={periods.get(toISODate(day)) === 'logged' ? 'month__period' : 'month__period month__period--predicted'} aria-hidden="true" />
+              )}
               <span className="month__dots" aria-hidden="true">
                 {items.slice(0, shownDots(items.length)).map((item, i) => (
                   <span key={i} className="month__dot" style={{ background: dotColor(item) }} />

@@ -1,14 +1,19 @@
 /** Réglages : modes affichés, horaires, planification, sauvegarde des données. */
 
-import { useId, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { toISODate } from '../core/time';
 import { parseExport } from '../storage/repository';
+import { canShareFiles, downloadFile, shareFiles } from '../ui/share';
+import { formatDeadline } from '../ui/format';
+import { useSync } from '../state/sync';
 import { useStore } from '../state/store';
 import { MODE_LABEL, MODES, useNav, type Mode } from '../state/nav';
 import { Field, Header, MODE_ICON } from '../ui/kit';
 import { IconChevronRight, IconPlus } from '../ui/icons';
 import { summarizeRules } from '../sheets/RangesEditor';
 import { formatPeriodDates, PeriodSheet, summarizePeriod, upcomingPeriods } from '../sheets/PeriodSheet';
+import { BUILD_NUMBER, isNative } from '../native/platform';
+import { latestApk, RELEASES_PAGE, type ApkRelease } from '../native/update';
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -18,6 +23,39 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
         {children}
       </div>
     </section>
+  );
+}
+
+/** Version ; dans l'appli Android, lien vers la nouvelle APK s'il y en a une, sinon lien vers l'APK. */
+function AppVersion() {
+  const [update, setUpdate] = useState<ApkRelease | null>(null);
+  useEffect(() => {
+    if (!isNative || !BUILD_NUMBER) return;
+    let cancelled = false;
+    void latestApk().then((r) => !cancelled && r && r.build > BUILD_NUMBER && setUpdate(r));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  const linkStyle = { color: 'var(--accent-text)', fontWeight: 700 } as const;
+  return (
+    <div style={{ margin: '32px 0 0', textAlign: 'center', fontSize: 13, color: 'var(--faint)', lineHeight: 1.6 }}>
+      <p style={{ margin: 0 }}>Planning — v0.3{isNative && BUILD_NUMBER ? ` · appli Android n°${BUILD_NUMBER}` : ''}</p>
+      {update && (
+        <p style={{ margin: 0 }}>
+          <a href={update.url} target="_blank" rel="noopener" style={linkStyle}>
+            Nouvelle version (n°{update.build}) : télécharger l’APK
+          </a>
+        </p>
+      )}
+      {!isNative && (
+        <p style={{ margin: 0 }}>
+          <a href={RELEASES_PAGE} target="_blank" rel="noopener" style={linkStyle}>
+            Appli Android avec widgets (APK)
+          </a>
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -64,6 +102,7 @@ function ModeSwitch({ mode, checked, disabled, onChange }: { mode: Mode; checked
 export function SettingsMode() {
   const { windows, settings, updateSettings, exportData, importData, loadSample } = useStore();
   const { visibleModes, setVisibleModes, openSheet, showToast } = useNav();
+  const { status: sync } = useSync();
   const fileRef = useRef<HTMLInputElement>(null);
   const ids = { def: useId(), buffer: useId(), horizon: useId() };
   /** Période spéciale ouverte : `{}` = nouvelle, `{ id }` = édition. */
@@ -77,19 +116,29 @@ export function SettingsMode() {
   const sortedWindows = [...windows].sort((a, b) => a.name.localeCompare(b.name, 'fr'));
   const periods = upcomingPeriods(windows);
 
+  /** Sauvegarde complète (toutes les données, cycle compris), réimportable avec « Importer ». */
+  const exportFile = async () => {
+    const data = await exportData();
+    return new File([JSON.stringify(data, null, 2)], `planning-${toISODate(new Date())}.json`, { type: 'application/json' });
+  };
+
   const doExport = async () => {
     try {
-      const data = await exportData();
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `planning-${toISODate(new Date())}.json`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-      showToast({ message: 'Export téléchargé' });
+      showToast({ message: await downloadFile(await exportFile()) });
+    } catch (err) {
+      console.error(err);
+      showToast({ message: "L'export a échoué." });
+    }
+  };
+
+  /** Menu de partage du téléphone : Enregistrer dans Drive, Fichiers, e-mail… */
+  const doShare = async () => {
+    try {
+      const file = await exportFile();
+      if (!canShareFiles([file])) {
+        await downloadFile(file);
+        showToast({ message: 'Partage indisponible ici : export téléchargé' });
+      } else if (await shareFiles([file], 'Sauvegarde Planning')) showToast({ message: 'Sauvegarde envoyée' });
     } catch (err) {
       console.error(err);
       showToast({ message: "L'export a échoué." });
@@ -208,9 +257,27 @@ export function SettingsMode() {
       </Section>
 
       <Section title="Données">
+        <button type="button" style={rowButton} onClick={() => openSheet({ kind: 'githubSync' })}>
+          <span style={{ flex: 1, minWidth: 0 }}>
+            <span style={{ display: 'block', fontSize: 16, fontWeight: 600 }}>Sauvegarde GitHub</span>
+            <span style={{ display: 'block', fontSize: 13, color: sync.lastError ? 'var(--danger)' : 'var(--muted)', marginTop: 2 }}>
+              {!sync.configured
+                ? 'Chiffrée et automatique, dans un dépôt privé'
+                : sync.lastError
+                  ? sync.lastError
+                  : `${sync.repoName} · ${sync.busy ? 'envoi…' : sync.lastPushAt ? `envoyée ${formatDeadline(sync.lastPushAt).toLowerCase()}` : 'pas encore envoyée'}${sync.auto ? '' : ' · manuelle'}`}
+            </span>
+          </span>
+          <span style={{ color: 'var(--faint)', display: 'inline-flex' }}>
+            <IconChevronRight size={18} />
+          </span>
+        </button>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '16px 0' }}>
-          <button type="button" className="btn btn--secondary btn--block" onClick={doExport}>
-            Exporter
+          <button type="button" className="btn btn--secondary btn--block" onClick={() => void doShare()}>
+            Sauvegarder sur Drive ou partager
+          </button>
+          <button type="button" className="btn btn--secondary btn--block" onClick={() => void doExport()}>
+            Télécharger l'export
           </button>
           <button type="button" className="btn btn--secondary btn--block" onClick={() => fileRef.current?.click()}>
             Importer
@@ -239,12 +306,13 @@ export function SettingsMode() {
             Charger un exemple
           </button>
           <p style={{ margin: '4px 2px 0', fontSize: 13, color: 'var(--muted)', lineHeight: 1.4 }}>
-            Les données restent sur ce téléphone. Exporte-les de temps en temps.
+            Les données restent sur ce téléphone. Sauvegarde-les de temps en temps : le fichier (cycle compris) se réimporte avec
+            « Importer ». Pour le cycle seul au format Clue : onglet Cycle › réglages › Exporter au format Clue.
           </p>
         </div>
       </Section>
 
-      <p style={{ margin: '32px 0 0', textAlign: 'center', fontSize: 13, color: 'var(--faint)' }}>Planning — v0.2</p>
+      <AppVersion />
       {period && <PeriodSheet key={period.id ?? 'new'} periodId={period.id} onClose={() => setPeriod(null)} />}
     </>
   );

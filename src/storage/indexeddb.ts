@@ -5,10 +5,13 @@ import {
   COLLECTIONS,
   EXPORT_APP,
   EXPORT_VERSION,
-  newer,
+  liveDeleted,
+  markDeleted,
+  mergeCollection,
   pickSettings,
   type CollectionName,
   type Collections,
+  type Deleted,
   type ExportData,
   type Repository,
 } from './repository';
@@ -20,11 +23,16 @@ interface PlanningDB extends DBSchema {
   events: { key: string; value: Collections['events'] };
   goals: { key: string; value: Collections['goals'] };
   timeEntries: { key: string; value: Collections['timeEntries'] };
+  cycleDays: { key: string; value: Collections['cycleDays'] };
+  cycleMarks: { key: string; value: Collections['cycleMarks'] };
   meta: { key: string; value: unknown };
 }
 
-const DB_VERSION = 1;
+/** 2 : collections du mode Cycle (créées à la mise à jour, sans toucher aux autres). */
+const DB_VERSION = 2;
 const SETTINGS_KEY = 'settings';
+/** Suppressions récentes (`Deleted`), dans `meta`. */
+const DELETED_KEY = 'deleted';
 
 /** Stockage local sur l'appareil (IndexedDB). */
 export class IndexedDBRepository implements Repository {
@@ -51,8 +59,25 @@ export class IndexedDBRepository implements Repository {
     await (await this.db).put(collection, item as never);
   }
 
+  async putMany<K extends CollectionName>(collection: K, items: Collections[K][]): Promise<void> {
+    const tx = (await this.db).transaction(collection, 'readwrite');
+    for (const item of items) void tx.store.put(item as never);
+    await tx.done;
+  }
+
   async remove(collection: CollectionName, id: ID): Promise<void> {
-    await (await this.db).delete(collection, id);
+    await this.removeMany(collection, [id]);
+  }
+
+  async removeMany(collection: CollectionName, ids: ID[]): Promise<void> {
+    if (!ids.length) return;
+    const tx = (await this.db).transaction([collection, 'meta'], 'readwrite');
+    const store = tx.objectStore(collection);
+    for (const id of ids) void store.delete(id);
+    const meta = tx.objectStore('meta');
+    const deleted = ((await meta.get(DELETED_KEY)) as Deleted | undefined) ?? {};
+    void meta.put(markDeleted(deleted, collection, ids), DELETED_KEY);
+    await tx.done;
   }
 
   async getSettings(): Promise<Settings> {
@@ -72,6 +97,8 @@ export class IndexedDBRepository implements Repository {
       settings: await this.getSettings(),
     } as ExportData;
     for (const c of COLLECTIONS) (out as Record<string, unknown>)[c] = await this.list(c);
+    const deleted = ((await (await this.db).get('meta', DELETED_KEY)) as Deleted | undefined) ?? {};
+    out.deleted = liveDeleted(deleted, out);
     return out;
   }
 
@@ -79,15 +106,20 @@ export class IndexedDBRepository implements Repository {
     const db = await this.db;
     const settings = pickSettings(await this.getSettings(), data.settings, mode);
     const tx = db.transaction([...COLLECTIONS, 'meta'], 'readwrite');
+    const meta = tx.objectStore('meta');
+    const localDeleted = mode === 'replace' ? {} : (((await meta.get(DELETED_KEY)) as Deleted | undefined) ?? {});
+    const deleted: Deleted = {};
     for (const c of COLLECTIONS) {
       const store = tx.objectStore(c);
+      const local = mode === 'replace' ? [] : ((await store.getAll()) as Collections[typeof c][]);
       if (mode === 'replace') await store.clear();
-      for (const item of data[c] as { id: ID; updatedAt: string }[]) {
-        const current = (await store.get(item.id)) as typeof item | undefined;
-        await store.put(newer(current, item) as never);
-      }
+      const merged = mergeCollection(local, localDeleted[c], data[c], data.deleted?.[c]);
+      for (const id of merged.remove) void store.delete(id);
+      for (const item of merged.put) void store.put(item as never);
+      deleted[c] = merged.deleted;
     }
-    await tx.objectStore('meta').put(settings, SETTINGS_KEY);
+    void meta.put(settings, SETTINGS_KEY);
+    void meta.put(deleted, DELETED_KEY);
     await tx.done;
   }
 }

@@ -68,7 +68,7 @@ export function ChecklistMode() {
         <h1 className="title">Aujourd'hui</h1>
         <button
           type="button"
-          className="pill pill--md"
+          className="pill pill--md pill--pop"
           onClick={() => {
             replan();
             showToast({ message: 'Journée replanifiée' });

@@ -1,0 +1,19 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Planning</string>
+    <string name="title_activity_main">Planning</string>
+    <string name="package_name">io.github.kuelitink.planning</string>
+    <string name="custom_url_scheme">io.github.kuelitink.planning</string>
+
+    <!-- Widgets -->
+    <string name="widget_today_label">Aujourd\'hui</string>
+    <string name="widget_today_description">La journée planifiée : tâches à cocher et événements.</string>
+    <string name="widget_next_label">Prochaine tâche</string>
+    <string name="widget_next_description">Ce qui est en cours ou juste après.</string>
+    <string name="widget_today_title">Aujourd\'hui</string>
+    <string name="widget_add">Ajouter une tâche</string>
+    <string name="widget_empty">Rien de prévu aujourd\'hui</string>
+    <string name="widget_stale">Ouvre Planning pour mettre à jour</string>
+    <string name="widget_check">Terminer</string>
+    <string name="widget_now">MAINTENANT</string>
+</resources>

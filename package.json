@@ -1,24 +1,33 @@
 {
   "name": "planning",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "module",
-  "description": "Application de planning mobile (PWA) : calendrier, to-do, auto-planification, objectifs et chrono.",
+  "description": "Application de planning mobile (PWA) : calendrier, to-do, auto-planification, objectifs, chrono et suivi du cycle.",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
+    "build:android": "tsc --noEmit && vite build --mode native && cap sync android",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@fontsource/outfit": "^5.3.0",
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/core": "^8.5.3",
+    "@capacitor/filesystem": "^8.1.5",
+    "@capacitor/share": "^8.0.3",
+    "@fontsource/fredoka": "^5.3.0",
+    "@fontsource/nunito": "^5.3.0",
+    "fflate": "^0.8.3",
     "idb": "^8.0.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.5.3",
     "@types/node": "^22.20.5",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",

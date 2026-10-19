@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Contour seul, en vecteur : une forme <shape> sans remplissage se remplit quand on la teinte. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="22dp"
+    android:height="22dp"
+    android:viewportWidth="22"
+    android:viewportHeight="22">
+    <path
+        android:pathData="M6,1 H16 A5,5 0 0 1 21,6 V16 A5,5 0 0 1 16,21 H6 A5,5 0 0 1 1,16 V6 A5,5 0 0 1 6,1 Z"
+        android:strokeWidth="2"
+        android:strokeColor="#FFFFFFFF" />
+</vector>

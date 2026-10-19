@@ -11,6 +11,7 @@ import {
   IconCalendar,
   IconChecklist,
   IconChevronDown,
+  IconDrop,
   IconLists,
   IconPause,
   IconPlay,
@@ -37,6 +38,7 @@ export const MODE_ICON: Record<Mode, (p: { size?: number }) => JSX.Element> = {
   lists: IconLists,
   goals: IconTarget,
   chrono: IconTimer,
+  cycle: IconDrop,
   settings: IconSettings,
 };
 
@@ -211,7 +213,7 @@ export function Segmented<T extends string | number>({
   );
 }
 
-/** Case ronde : le contour donne la priorité. */
+/** Case carrée : le contour donne la priorité. */
 export function PriorityCheck({
   priority,
   checked,

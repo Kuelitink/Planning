@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Ligne de tâche : carte blanche cernée, comme .row dans l'appli. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="@color/planning_card" />
+    <stroke android:width="1.5dp" android:color="@color/planning_ink" />
+    <corners android:radius="14dp" />
+</shape>

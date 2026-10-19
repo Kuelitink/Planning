@@ -1,8 +1,8 @@
-// Génère les icônes PNG de la PWA (sans dépendance) : node scripts/gen-icons.mjs
+// Génère les icônes PNG de la PWA et de l'appli Android (sans dépendance) : node scripts/gen-icons.mjs
 // Motif « Grille » : mini-calendrier 3×3 de pastilles aux couleurs des listes, aujourd'hui
 // en noir, sur fond blanc. Même dessin que public/icon.svg (repère 200×200).
 import { deflateSync } from 'node:zlib';
-import { writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 
 const hex = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
 const BG = hex('#FFFFFF');
@@ -99,3 +99,16 @@ writeFileSync(new URL('icon-512.png', out), render(512, { radius: 0.22, scale: 1
 writeFileSync(new URL('icon-maskable-512.png', out), render(512, { radius: 0, scale: 0.8 }));
 writeFileSync(new URL('apple-touch-icon.png', out), render(180, { radius: 0, scale: 0.9 }));
 console.log('Icônes écrites dans public/');
+
+// Appli Android : icône classique, ronde, et premier plan de l'icône adaptative (108 dp, motif
+// dans la zone sûre de 66 dp ; fond blanc = @color/ic_launcher_background).
+const res = new URL('../android/app/src/main/res/', import.meta.url);
+const DENSITIES = { mdpi: 1, hdpi: 1.5, xhdpi: 2, xxhdpi: 3, xxxhdpi: 4 };
+for (const [name, k] of Object.entries(DENSITIES)) {
+  const dir = new URL(`mipmap-${name}/`, res);
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(new URL('ic_launcher.png', dir), render(48 * k, { radius: 0.22, scale: 1 }));
+  writeFileSync(new URL('ic_launcher_round.png', dir), render(48 * k, { radius: 0.5, scale: 0.85 }));
+  writeFileSync(new URL('ic_launcher_foreground.png', dir), render(108 * k, { radius: 0, scale: 0.7 }));
+}
+console.log('Icônes Android écrites dans android/app/src/main/res/');
