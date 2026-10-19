@@ -18,6 +18,9 @@ export const MODE_LABEL: Record<Mode, string> = {
   settings: 'Réglages',
 };
 
+/** Analyses détaillées du mode Cycle. */
+export type InsightTopic = 'length' | 'flow' | 'pain' | 'mood' | 'sleep' | 'bbt';
+
 export type SheetState =
   | { kind: 'task'; id?: ID; defaults?: Partial<Task> }
   | { kind: 'event'; id?: ID; date?: Date }
@@ -30,6 +33,7 @@ export type SheetState =
   /** Mode Cycle : saisie d'un jour, détail d'un cycle, réglages, import Clue. */
   | { kind: 'cycleDay'; date: ISODate }
   | { kind: 'cycle'; start: ISODate }
+  | { kind: 'cycleInsight'; topic: InsightTopic }
   | { kind: 'cycleSettings' }
   | { kind: 'cycleImport' };
 

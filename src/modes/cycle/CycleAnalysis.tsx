@@ -1,13 +1,17 @@
-/** Vue Analyse du mode Cycle : moyennes, régularité, historique des cycles, tendances, mesures. */
+/** Vue Analyse du mode Cycle : moyennes, analyses détaillées, historique des cycles, tendances. */
 
 import { useMemo, useState } from 'react';
 import type { Cycle } from '../../core/cycle';
-import { addDaysISO, daysBetween, patterns, regularity } from '../../core/cycle';
+import { addDaysISO, patterns, regularity } from '../../core/cycle';
 import { CATEGORY_BY_KEY, categoryLabel, optionLabel } from '../../core/cycleCatalog';
+import { byPhase, flowProfile, phaseLifts, timing } from '../../core/insights';
 import { parseISODate } from '../../core/time';
 import { useCycle } from '../../state/cycle';
-import { useNav } from '../../state/nav';
-import { dayMonth, formatBbt, formatKg, formatSleep, plural } from './shared';
+import { useNav, type InsightTopic } from '../../state/nav';
+import { IconChevronRight } from '../../ui/icons';
+import { INSIGHT_COLOR, INSIGHT_TITLE, windowText } from './insights';
+import { DAY_PHASE_IN } from './phaseInfo';
+import { dayMonth, formatBbt, formatKg, formatRange, formatSleep, plural } from './shared';
 
 const fmt1 = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 1 });
 const HEAT_DAYS = 40;
@@ -23,7 +27,8 @@ const REGULARITY: Record<NonNullable<ReturnType<typeof regularity>>, string> = {
 function cycleDates(c: Cycle): string {
   if (!c.next) return `Depuis le ${dayMonth(c.start)}`;
   const end = addDaysISO(c.next, -1);
-  return `${dayMonth(c.start)} – ${dayMonth(end)} ${end.slice(0, 4)}`;
+  const startYear = c.start.slice(0, 4) !== end.slice(0, 4) ? ` ${c.start.slice(0, 4)}` : '';
+  return `${dayMonth(c.start)}${startYear} – ${dayMonth(end)} ${end.slice(0, 4)}`;
 }
 
 function Tile({ label, value, unit, hint }: { label: string; value: string; unit?: string; hint?: string }) {
@@ -39,104 +44,71 @@ function Tile({ label, value, unit, hint }: { label: string; value: string; unit
   );
 }
 
-/** Durées des derniers cycles en barres, avec la moyenne. */
-function LengthChart({ cycles, mean }: { cycles: Cycle[]; mean?: number }) {
-  const W = 320;
-  const H = 130;
-  const top = 10;
-  const bottom = 22;
-  const max = Math.max(40, ...cycles.map((c) => c.length ?? 0));
-  const bw = W / Math.max(cycles.length, 1);
-  const y = (v: number) => top + (H - top - bottom) * (1 - v / max);
+/** Ligne d'analyse détaillée : ouvre sa feuille. */
+function InsightRow({ topic, summary }: { topic: InsightTopic; summary: string }) {
+  const { openSheet } = useNav();
   return (
-    <svg className="cy-chart" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Durée des ${cycles.length} derniers cycles`}>
-      {cycles.map((c, i) => {
-        const off = c.excluded || c.atypical;
-        const len = c.length ?? 0;
-        return (
-          <g key={c.start}>
-            <rect
-              x={i * bw + bw * 0.18}
-              y={y(len)}
-              width={bw * 0.64}
-              height={Math.max(0, H - bottom - y(len))}
-              rx={4}
-              style={{ fill: off ? 'var(--soft)' : 'var(--cy-period-soft)', stroke: off ? 'var(--faint)' : 'var(--ink)', strokeWidth: 1.2 }}
-            />
-            <text
-              x={i * bw + bw / 2}
-              y={y(len) - 3}
-              textAnchor="middle"
-              style={{ fontSize: 10, fontWeight: 600, fill: off ? 'var(--faint)' : 'var(--ink)' }}
-            >
-              {len}
-            </text>
-            <text x={i * bw + bw / 2} y={H - 6} textAnchor="middle" style={{ fontSize: 9, fill: 'var(--muted)' }}>
-              {parseISODate(c.start).toLocaleDateString('fr-FR', { month: 'narrow' })}
-            </text>
-          </g>
-        );
-      })}
-      {mean !== undefined && (
-        <line x1={0} x2={W} y1={y(mean)} y2={y(mean)} style={{ stroke: 'var(--cy-period)', strokeWidth: 1.5, strokeDasharray: '4 3' }} />
-      )}
-    </svg>
+    <button type="button" className="cy-insight" onClick={() => openSheet({ kind: 'cycleInsight', topic })}>
+      <span className="cy-swatch" style={{ background: INSIGHT_COLOR[topic] }} aria-hidden="true" />
+      <span className="cy-insight__text">
+        <span className="cy-insight__title">{INSIGHT_TITLE[topic]}</span>
+        <span className="cy-insight__sub">{summary}</span>
+      </span>
+      <IconChevronRight size={18} />
+    </button>
   );
 }
 
-/** Courbe d'une mesure (température basale) sur les jours du cycle en cours. */
-function LineChart({ points, label }: { points: { x: number; y: number }[]; label: string }) {
-  const W = 320;
-  const H = 120;
-  const pad = 12;
-  const xs = points.map((p) => p.x);
-  const ys = points.map((p) => p.y);
-  const [x0, x1] = [Math.min(...xs), Math.max(...xs, Math.min(...xs) + 1)];
-  const [y0, y1] = [Math.min(...ys) - 0.1, Math.max(...ys) + 0.1];
-  const px = (x: number) => pad + ((W - 2 * pad) * (x - x0)) / (x1 - x0);
-  const py = (v: number) => pad + ((H - 2 * pad) * (y1 - v)) / (y1 - y0);
-  const d = points.map((p, i) => `${i ? 'L' : 'M'}${px(p.x).toFixed(1)} ${py(p.y).toFixed(1)}`).join('');
-  return (
-    <svg className="cy-chart" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={label}>
-      <path d={d} style={{ fill: 'none', stroke: 'var(--cy-period)', strokeWidth: 2 }} />
-      {points.map((p) => (
-        <circle key={p.x} cx={px(p.x)} cy={py(p.y)} r={3} style={{ fill: 'var(--cy-period)' }} />
-      ))}
-    </svg>
-  );
-}
+type HistoryFilter = 'all' | 'kept' | 'excluded' | 'atypical' | 'note';
+
+const FILTERS: { value: HistoryFilter; label: string; test: (c: Cycle) => boolean }[] = [
+  { value: 'all', label: 'Tous', test: () => true },
+  { value: 'kept', label: 'Retenus', test: (c) => !c.excluded && !c.atypical },
+  { value: 'excluded', label: 'Exclus', test: (c) => c.excluded },
+  { value: 'atypical', label: 'Atypiques', test: (c) => c.atypical },
+  { value: 'note', label: 'Avec note', test: (c) => Boolean(c.note) },
+];
 
 export function CycleAnalysis() {
   const { openSheet } = useNav();
-  const { forecast: fc, byDate, today } = useCycle();
+  const { forecast: fc, days, contexts, today } = useCycle();
   const [allCycles, setAllCycles] = useState(false);
   const [allPatterns, setAllPatterns] = useState(false);
+  const [filter, setFilter] = useState<HistoryFilter>('all');
   const { stats, cycles } = fc;
-  const days = useMemo(() => [...byDate.values()], [byDate]);
   const trends = useMemo(() => patterns(days, cycles, HEAT_DAYS), [days, cycles]);
 
-  const measures = useMemo(() => {
-    const since = addDaysISO(today, -90);
-    const sleep = days.filter((d) => d.sleepMin !== undefined && d.date >= since);
-    const sleepAll = days.filter((d) => d.sleepMin !== undefined);
-    const sleepSet = sleep.length ? sleep : sleepAll;
-    const sorted = [...days].sort((a, b) => a.date.localeCompare(b.date));
-    const lastBbt = [...sorted].reverse().find((d) => d.bbt !== undefined);
-    const lastWeight = [...sorted].reverse().find((d) => d.weightKg !== undefined);
-    const bbtCycle = fc.cycleStart
-      ? sorted
-          .filter((d) => d.bbt !== undefined && d.date >= fc.cycleStart!)
-          .map((d) => ({ x: daysBetween(fc.cycleStart!, d.date) + 1, y: d.bbt! }))
-      : [];
+  // Résumés des analyses détaillées.
+  const summaries = useMemo(() => {
+    const flow = flowProfile(days, cycles);
+    const cramps = timing(days, fc, 'pain', 'period_cramps');
+    const lifts = phaseLifts(byPhase(days, contexts, 'feelings'));
+    const nights = days.filter((d) => d.sleepMin !== undefined);
+    const lastBbt = days.filter((d) => d.bbt !== undefined).sort((a, b) => b.date.localeCompare(a.date))[0];
+    const lastWeight = days.filter((d) => d.weightKg !== undefined).sort((a, b) => b.date.localeCompare(a.date))[0];
     return {
-      sleepAvg: sleepSet.length ? sleepSet.reduce((s, d) => s + d.sleepMin!, 0) / sleepSet.length : undefined,
-      sleepCount: sleepSet.length,
-      sleepRecent: sleep.length > 0,
-      lastBbt,
-      lastWeight,
-      bbtCycle,
+      flow: flow.heaviestDay
+        ? `Plus abondantes le J${flow.heaviestDay} · ${Math.round(flow.heavyShare * 100)} % avec un jour abondant`
+        : 'Abondance jour par jour',
+      pain: cramps.cycles
+        ? `Crampes dans ${cramps.cycles} cycles sur ${cramps.tracked}${
+            cramps.next && cramps.next[1] >= today
+              ? ` · prochaines vers le ${formatRange(cramps.next[0], cramps.next[1])}`
+              : cramps.window
+                ? `, ${windowText(cramps.window)}`
+                : ''
+          }`
+        : 'Moment et intensité des douleurs',
+      mood: lifts[0]
+        ? `${optionLabel('feelings', lifts[0].option)} : surtout ${DAY_PHASE_IN[lifts[0].phase]}`
+        : 'Émotions, mental et énergie selon la phase',
+      sleep: nights.length
+        ? `${formatSleep(nights.reduce((s, d) => s + d.sleepMin!, 0) / nights.length)} en moyenne · ${plural(nights.length, 'nuit')}`
+        : undefined,
+      bbt: lastBbt ? `Dernière : ${formatBbt(lastBbt.bbt!)} le ${dayMonth(lastBbt.date)}` : undefined,
+      weight: lastWeight,
     };
-  }, [days, today, fc.cycleStart]);
+  }, [days, cycles, fc, contexts, today]);
 
   if (!cycles.length) {
     return (
@@ -146,9 +118,7 @@ export function CycleAnalysis() {
     );
   }
 
-  const completed = cycles.filter((c) => c.length !== undefined);
-  const recent = completed.slice(-12);
-  const history = [...cycles].reverse();
+  const history = [...cycles].reverse().filter(FILTERS.find((f) => f.value === filter)!.test);
   const shownHistory = allCycles ? history : history.slice(0, 12);
   const shownPatterns = allPatterns ? trends : trends.slice(0, 10);
   const reg = regularity(stats.variation);
@@ -182,17 +152,43 @@ export function CycleAnalysis() {
         moyennes.
       </p>
 
-      {recent.length > 1 && (
-        <section className="section">
-          <h2 className="section-label">Durée des derniers cycles</h2>
-          <div className="cy-card">
-            <LengthChart cycles={recent} mean={stats.meanCycle} />
+      <section className="section">
+        <h2 className="section-label">Analyses détaillées</h2>
+        <div className="cy-card" style={{ padding: '0 16px' }}>
+          <InsightRow
+            topic="length"
+            summary={
+              stats.meanCycle !== undefined
+                ? `${fmt1.format(stats.meanCycle)} j en moyenne${stats.variation !== null ? ` · variation ${stats.variation} j` : ''}`
+                : 'Durée et variation des cycles'
+            }
+          />
+          <InsightRow topic="flow" summary={summaries.flow} />
+          <InsightRow topic="pain" summary={summaries.pain} />
+          <InsightRow topic="mood" summary={summaries.mood} />
+          {summaries.sleep && <InsightRow topic="sleep" summary={summaries.sleep} />}
+          <InsightRow topic="bbt" summary={summaries.bbt ?? 'Courbe et décalage thermique'} />
+        </div>
+        {summaries.weight && (
+          <div className="cy-tiles" style={{ marginTop: 8 }}>
+            <Tile label="Poids" value={formatKg(summaries.weight.weightKg!)} hint={`le ${dayMonth(summaries.weight.date)}`} />
           </div>
-        </section>
-      )}
+        )}
+      </section>
 
       <section className="section">
         <h2 className="section-label">Historique des cycles</h2>
+        <div className="cy-chips" role="group" aria-label="Filtrer les cycles" style={{ marginBottom: 8 }}>
+          {FILTERS.map((f) => {
+            const n = cycles.filter(f.test).length;
+            if (f.value !== 'all' && !n) return null;
+            return (
+              <button key={f.value} type="button" className="chip" aria-pressed={filter === f.value} onClick={() => setFilter(f.value)}>
+                {f.label} · {n}
+              </button>
+            );
+          })}
+        </div>
         <div className="cy-card" style={{ padding: '4px 16px' }}>
           {shownHistory.map((c) => {
             const len = c.length ?? fc.cycleDay ?? 1;
@@ -262,35 +258,6 @@ export function CycleAnalysis() {
             <button type="button" className="link-btn" onClick={() => setAllPatterns((v) => !v)}>
               {allPatterns ? 'Afficher moins' : `Afficher les ${trends.length} tendances`}
             </button>
-          )}
-        </section>
-      )}
-
-      {(measures.sleepAvg !== undefined || measures.lastBbt || measures.lastWeight) && (
-        <section className="section">
-          <h2 className="section-label">Mesures</h2>
-          <div className="cy-tiles">
-            {measures.sleepAvg !== undefined && (
-              <Tile
-                label="Sommeil moyen"
-                value={formatSleep(measures.sleepAvg)}
-                hint={`${plural(measures.sleepCount, 'nuit')}${measures.sleepRecent ? ' · 90 derniers jours' : ''}`}
-              />
-            )}
-            {measures.lastBbt && (
-              <Tile label="Température" value={formatBbt(measures.lastBbt.bbt!)} hint={`le ${dayMonth(measures.lastBbt.date)}`} />
-            )}
-            {measures.lastWeight && (
-              <Tile label="Poids" value={formatKg(measures.lastWeight.weightKg!)} hint={`le ${dayMonth(measures.lastWeight.date)}`} />
-            )}
-          </div>
-          {measures.bbtCycle.length >= 3 && (
-            <div className="cy-card" style={{ marginTop: 8 }}>
-              <p className="cy-card__sub" style={{ margin: '0 0 8px' }}>
-                Température basale du cycle en cours
-              </p>
-              <LineChart points={measures.bbtCycle} label="Température basale du cycle en cours" />
-            </div>
           )}
         </section>
       )}

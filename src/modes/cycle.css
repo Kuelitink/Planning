@@ -763,3 +763,148 @@
   background: var(--cy-period-soft);
   outline: 1px dashed var(--cy-period);
 }
+
+/* --- Analyses détaillées ------------------------------------------------------- */
+
+.cy-insight {
+  width: 100%;
+  min-height: 64px;
+  padding: 10px 0;
+  border: none;
+  border-bottom: 1.5px solid var(--line);
+  background: transparent;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  color: var(--ink);
+}
+
+.cy-insight:last-child {
+  border-bottom: none;
+}
+
+.cy-insight__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cy-insight__title {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.cy-insight__sub {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.cy-chart__caption {
+  min-height: 18px;
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.cy-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cy-bars__row {
+  display: grid;
+  grid-template-columns: minmax(84px, 38%) 1fr auto;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.cy-bars__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cy-bars__track {
+  height: 12px;
+  display: flex;
+}
+
+.cy-bars__track span {
+  min-width: 2px;
+  height: 100%;
+  border-radius: 0 4px 4px 0;
+}
+
+.cy-bars__value {
+  min-width: 44px;
+  text-align: right;
+  font-size: 13px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.cy-flowgrid {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cy-flowgrid__row {
+  display: grid;
+  grid-template-columns: 72px repeat(8, minmax(0, 1fr));
+  align-items: center;
+  gap: 2px;
+}
+
+.cy-flowgrid__date {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.cy-flowgrid__cell {
+  height: 18px;
+  border-radius: 4px;
+}
+
+.cy-month-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: -4px 0 8px;
+}
+
+.cy-phase__text {
+  margin: 10px 0 0;
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.cy-phase__label {
+  margin: 14px 0 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Barres et points touchables : la sélection (le reste estompé) tient lieu de repère. */
+.cy-chart [role='button']:focus {
+  outline: none;
+}
+
+.cy-chart [role='button']:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 1px;
+}

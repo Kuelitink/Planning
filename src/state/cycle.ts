@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CycleDay, CycleSettings, ISODate } from '../core/types';
 import { forecast, hasLog, type Forecast } from '../core/cycle';
+import { dayContexts, type DayContext } from '../core/insights';
 import { cycleSettingsOf } from '../core/cycleCatalog';
 import { cycleReminders, type Reminder } from '../core/reminders';
 import { formatHM, parseISODate, toISODate } from '../core/time';
@@ -14,6 +15,9 @@ export interface CycleView {
   today: ISODate;
   forecast: Forecast;
   byDate: Map<ISODate, CycleDay>;
+  days: CycleDay[];
+  /** Cycle et phase estimée de chaque jour noté, pour les analyses. */
+  contexts: Map<ISODate, DayContext>;
   reminders: Reminder[];
 }
 
@@ -44,7 +48,8 @@ export function useCycle(): CycleView {
     () => cycleReminders(fc, settings, today, time, loggedToday, formatISODay),
     [fc, settings, today, time, loggedToday],
   );
-  return { settings, today, forecast: fc, byDate, reminders };
+  const contexts = useMemo(() => dayContexts(cycleDays, fc, settings.pmsDays), [cycleDays, fc, settings.pmsDays]);
+  return { settings, today, forecast: fc, byDate, days: cycleDays, contexts, reminders };
 }
 
 const NOTIFIED_KEY = 'planning.cycleNotified';

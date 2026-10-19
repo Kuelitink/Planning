@@ -6,7 +6,10 @@
 
 import { useMemo, useState } from 'react';
 import type { ISODate } from '../core/types';
-import { addDaysISO, dayMarks, daysBetween } from '../core/cycle';
+import { addDaysISO, dayMarks, daysBetween, type Forecast } from '../core/cycle';
+import type { CycleSettings } from '../core/types';
+import { categoryLabel, optionLabel } from '../core/cycleCatalog';
+import { phaseHighlights, timing } from '../core/insights';
 import { parseISODate } from '../core/time';
 import { useCycle } from '../state/cycle';
 import { useNav } from '../state/nav';
@@ -15,6 +18,7 @@ import { IconBell, IconSettings, IconUpload } from '../ui/icons';
 import { CycleRing } from './cycle/CycleRing';
 import { CycleCalendar } from './cycle/CycleCalendar';
 import { CycleAnalysis } from './cycle/CycleAnalysis';
+import { PHASE_INFO, historyPhase } from './cycle/phaseInfo';
 import { DayChips, Legend, WEEKDAY_LETTER, dayMonth, formatRange, numClass, phaseLabel, plural, relativeDays } from './cycle/shared';
 import './cycle.css';
 
@@ -83,7 +87,7 @@ export function CycleMode() {
 /** Vue « Cycle » : anneau, rappels, semaine, aujourd'hui, prédictions. */
 function CycleToday() {
   const { openSheet } = useNav();
-  const { settings, today, forecast: fc, byDate, reminders } = useCycle();
+  const { settings, today, forecast: fc, byDate, days, reminders } = useCycle();
   const hasData = Boolean(fc.cycleStart);
   const length = fc.cycleLength ?? settings.cycleLength;
   const start = fc.cycleStart;
@@ -106,6 +110,8 @@ function CycleToday() {
   const nextFertile = fc.upcoming.find((u) => u.fertile[1] >= today)?.fertile;
   const nextOvulation = fc.upcoming.find((u) => u.ovulation >= today)?.ovulation;
   const nextPms = fc.upcoming.find((u) => u.pms[1] >= today)?.pms;
+  // Crampes probables : leur moment habituel appliqué aux prochaines règles (3 cycles concernés au moins).
+  const cramps = useMemo(() => timing(days, fc, 'pain', 'period_cramps').next, [days, fc]);
 
   return (
     <>
@@ -203,6 +209,8 @@ function CycleToday() {
         </section>
       )}
 
+      {hasData && fc.phase && <PhaseCard fc={fc} settings={settings} today={today} />}
+
       {hasData && fc.nextPeriod && (
         <section className="section">
           <h2 className="section-label">Prédictions</h2>
@@ -242,6 +250,16 @@ function CycleToday() {
                 </span>
               </div>
             )}
+            {cramps && cramps[1] >= today && (
+              <div className="cy-pred">
+                <span className="cy-swatch" style={{ background: '#D6457A' }} aria-hidden="true" />
+                <span className="cy-pred__label">Crampes probables</span>
+                <span className="cy-pred__value">
+                  {formatRange(cramps[0], cramps[1])}
+                  <small>{cramps[0] <= today ? 'en cours' : relativeDays(daysBetween(today, cramps[0]))}</small>
+                </span>
+              </div>
+            )}
             {settings.showPms && nextPms && (
               <div className="cy-pred">
                 <span className="cy-swatch" style={{ background: 'var(--cy-pms-soft)' }} aria-hidden="true" />
@@ -262,5 +280,68 @@ function CycleToday() {
         </section>
       )}
     </>
+  );
+}
+
+/** Fin de la phase en cours (veille de la phase suivante). */
+function phaseEnd(fc: Forecast): string | undefined {
+  switch (fc.phase) {
+    case 'period':
+      return fc.periodUntil;
+    case 'follicular':
+      return fc.fertile && addDaysISO(fc.fertile[0], -1);
+    case 'fertile':
+    case 'ovulation':
+      return fc.fertile?.[1];
+    case 'luteal':
+      return fc.pms && addDaysISO(fc.pms[0], -1);
+    case 'pms':
+      return fc.nextPeriod && addDaysISO(fc.nextPeriod, -1);
+    default:
+      return undefined;
+  }
+}
+
+/** La phase en cours : ce qui se passe dans le corps, et ce qui revient chez toi à ce moment-là. */
+function PhaseCard({ fc, settings, today }: { fc: Forecast; settings: CycleSettings; today: ISODate }) {
+  const { days, contexts } = useCycle();
+  const phase = fc.phase!;
+  // Phase masquée dans les réglages : on montre le texte de la phase affichée à la place.
+  const shown =
+    (phase === 'fertile' || phase === 'ovulation') && !settings.showFertile
+      ? 'follicular'
+      : phase === 'pms' && !settings.showPms
+        ? 'luteal'
+        : phase;
+  const info = PHASE_INFO[shown === 'ovulation' ? 'fertile' : shown];
+  const highlights = useMemo(() => phaseHighlights(days, contexts, historyPhase(phase)), [days, contexts, phase]);
+  const end = phaseEnd(fc);
+
+  return (
+    <section className="section cy-card" aria-label="Ta phase">
+      <h2 className="cy-card__title">{phaseLabel(phase, settings)}</h2>
+      <p className="cy-card__sub">
+        Jour {fc.cycleDay} du cycle{end && end >= today ? ` · jusqu'au ${dayMonth(end)}` : ''}
+      </p>
+      <p className="cy-phase__text">{info.body}</p>
+      <p className="cy-phase__text">{info.feel}</p>
+      {highlights.length > 0 && (
+        <>
+          <h3 className="cy-phase__label">Chez toi à ce moment du cycle</h3>
+          <div className="cy-chips">
+            {highlights.map((h) => (
+              <span key={`${h.category}.${h.option}`} className="cy-tag">
+                {h.category === 'pms' ? 'SPM' : optionLabel(h.category, h.option)}
+                <span style={{ color: 'var(--muted)', fontWeight: 600 }}>
+                  {h.category !== 'pms' ? `${categoryLabel(h.category)} · ` : ''}
+                  {h.cycles}/{h.of} cycles
+                </span>
+              </span>
+            ))}
+          </div>
+        </>
+      )}
+      <p className="cy-foot">{info.tip} Infos générales, pas un avis médical.</p>
+    </section>
   );
 }

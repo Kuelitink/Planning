@@ -33,7 +33,7 @@ node scripts/gen-icons.mjs  # régénère les icônes PNG
   - `daily.ts` to-do du jour et totaux ; `goals.ts` objectifs ; `timer.ts` chrono ;
   - `time.ts`, `intervals.ts`, `windows.ts`, `events.ts` utilitaires (heure locale, récurrences) ;
   - `cycle.ts` cycles, moyennes et prédictions (règles de calcul en tête du fichier) ;
-    `cycleCatalog.ts` catégories de suivi ; `reminders.ts` rappels ;
+    `cycleCatalog.ts` catégories de suivi ; `insights.ts` analyses détaillées ; `reminders.ts` rappels ;
     `clue.ts` import des exports Clue ; `zip.ts` lecture des zip chiffrés (ZipCrypto).
 - `src/storage/` — interface `Repository` (IndexedDB, mémoire), export/import JSON.
 - `src/state/` — état React : `store.tsx` (données, plan, chrono, cycle), `cycle.ts` (prédictions
@@ -52,9 +52,16 @@ Suivi du cycle menstruel inspiré de Clue :
   les rappels du jour, la semaine, ce qui est noté aujourd'hui et les prédictions (prochaines
   règles avec fourchette, fenêtre fertile, ovulation, SPM, retard).
 - **Calendrier** : règles notées et prévues, fenêtres fertiles, SPM et jours notés, mois par mois.
-- **Analyse** : cycle et règles moyens, variation (régularité), durée des derniers cycles,
-  historique (exclure un cycle des prédictions, l'annoter), tendances des symptômes par jour du
-  cycle, sommeil, température basale et poids.
+- **Analyse** : cycle et règles moyens, variation (régularité), historique filtrable (exclure un
+  cycle des prédictions, l'annoter), tendances des symptômes par jour du cycle, et des analyses
+  détaillées façon Clue Plus :
+  - durée du cycle (derniers cycles, plus court / plus long, médiane, tendance, répartition) ;
+  - règles (abondance jour par jour, jour le plus abondant, dernières règles, spotting) ;
+  - crampes et douleurs (moment habituel, intensité, prochaines crampes probables) ;
+  - humeur et énergie par phase (émotions, mental, énergie : ce qui ressort de chaque phase) ;
+  - sommeil (dernières nuits, moyenne par phase) ;
+  - température basale (courbe par cycle, décalage thermique « 3 au-dessus de 6 »).
+- **Phase en cours** : ce qui se passe dans le corps et ce qui revient chez toi à ce moment du cycle.
 - **Noter un jour** : règles (4 intensités), spotting, douleurs (avec intensité), émotions, SPM,
   énergie, mental, sommeil, sexualité, pertes, protection, social, digestion, selles, envies,
   poitrine, peau, cheveux, sport, sorties, médicaments, pilule, stérilet, tests, maux,

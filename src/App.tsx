@@ -18,6 +18,7 @@ import { CycleDaySheet } from './sheets/CycleDaySheet';
 import { CycleSheet } from './sheets/CycleSheet';
 import { CycleSettingsSheet } from './sheets/CycleSettingsSheet';
 import { CycleImportSheet } from './sheets/CycleImportSheet';
+import { CycleInsightSheet } from './sheets/CycleInsightSheet';
 import { useCycleNotifications } from './state/cycle';
 
 function CurrentMode() {
@@ -60,6 +61,8 @@ function CurrentSheet() {
       return <CycleDaySheet key={sheet.date} date={sheet.date} onClose={closeSheet} />;
     case 'cycle':
       return <CycleSheet key={sheet.start} start={sheet.start} onClose={closeSheet} />;
+    case 'cycleInsight':
+      return <CycleInsightSheet key={sheet.topic} topic={sheet.topic} onClose={closeSheet} />;
     case 'cycleSettings':
       return <CycleSettingsSheet onClose={closeSheet} />;
     case 'cycleImport':
