@@ -1,16 +1,13 @@
 # Planning
 
-Application de planning pour téléphone (PWA installable), dans l'esprit de FlowSavvy :
+Application de planning pour téléphone Android (APK), dans l'esprit de FlowSavvy :
 calendrier avec événements et to-do, **auto-planification** des tâches (priorités, échéances,
 dépendances, horaires autorisés), listes/projets, objectifs du jour/semaine/mois, chrono, et suivi
 du cycle menstruel façon Clue (avec import des données Clue).
 
-Hébergée gratuitement sur GitHub Pages ; les données restent sur l'appareil (IndexedDB),
-avec export/import JSON (à envoyer sur Drive par le menu de partage) et une sauvegarde
-automatique chiffrée dans un dépôt GitHub privé.
-Existe aussi en **appli Android (APK)** avec deux widgets d'écran d'accueil (voir plus bas).
-
-**En ligne :** https://kuelitink.github.io/Planning/
+Les données restent sur l'appareil (IndexedDB), avec export/import JSON (à envoyer sur Drive par
+le menu de partage) et une sauvegarde automatique chiffrée dans un dépôt GitHub privé.
+Deux widgets d'écran d'accueil (voir plus bas).
 
 L'app fonctionne par **modes**, choisis dans le menu en haut à gauche : Calendrier,
 Checklist (to-do du jour auto-planifiée), Listes, Objectifs, Chrono, Cycle, et Réglages. Les détails
@@ -108,9 +105,9 @@ qu'elle est ouverte). Au démarrage, une version envoyée par un autre appareil 
 
 ## Appli Android et widgets
 
-Le même code, empaqueté avec [Capacitor](https://capacitorjs.com/) : les données restent dans
-l'appli (comme la PWA, mais séparées d'elle : pour retrouver les données de la PWA, utiliser la
-sauvegarde GitHub ou export/import). En plus de la PWA :
+L'appli web, empaquetée avec [Capacitor](https://capacitorjs.com/) : les données restent dans
+l'appli. L'ancienne version en ligne (GitHub Pages, arrêtée) avait ses propres données : pour les
+retrouver, utiliser la sauvegarde GitHub ou export/import. En plus de l'appli web :
 
 - **Widget « Aujourd'hui »** : la journée planifiée (événements, tâches avec leur case à cocher,
   pastille de la liste, heure), le nombre de tâches à faire et faites, et un bouton + pour ajouter
@@ -139,10 +136,3 @@ ce mot de passe, et enregistrée dans `android/planning-release.p12`. Sans le se
 construite (artefact du passage) mais pas publiée. Ne pas perdre ce mot de passe : une APK signée
 avec une autre clé ne s'installe pas par-dessus (il faudrait désinstaller, puis restaurer depuis
 la sauvegarde GitHub).
-
-## Déploiement sur GitHub Pages
-
-Chaque push sur `main` lance `.github/workflows/deploy.yml` : tests, build, puis publication de
-`dist/` sur la branche `gh-pages`, servie par GitHub Pages (Settings › Pages › Source : branche
-`gh-pages`). Sur le téléphone : ouvrir l'URL dans Chrome, puis menu ⋮ › « Ajouter à l'écran
-d'accueil » / « Installer l'application ».

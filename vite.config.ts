@@ -2,7 +2,7 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
-// `base: './'` : chemins relatifs, l'app fonctionne sous https://<compte>.github.io/planning/.
+// `base: './'` : chemins relatifs, l'app fonctionne quel que soit le dossier d'où elle est servie.
 // `--mode native` (appli Android) : sans service worker, les fichiers sont dans l'APK.
 export default defineConfig(({ mode }) => ({
   base: './',
