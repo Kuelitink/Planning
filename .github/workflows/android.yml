@@ -72,7 +72,7 @@ jobs:
         run: ./gradlew testDebugUnitTest assembleRelease --no-daemon
 
       - run: cp android/app/build/outputs/apk/release/app-release.apk planning.apk
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: planning-apk
           path: |
