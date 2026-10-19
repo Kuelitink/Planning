@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { createEntity } from '../src/core/entity';
 import type { Goal, TimeEntry } from '../src/core/types';
 import { schedule } from '../src/core/scheduler';
-import { computePlan, tasksForScheduling, type AppData } from '../src/state/store';
+import { initialSeed, sampleData } from '../src/state/defaults';
+import { computePlan, mergeSample, tasksForScheduling, type AppData } from '../src/state/store';
 import { at, blocksOf, settings, task } from './helpers';
 
 const entry = (id: string, taskId: string, start: string, end?: string): TimeEntry =>
@@ -104,5 +105,30 @@ describe('objectifs et planification', () => {
     const plan = computePlan(d, at('2026-10-19 21:00'));
     expect(blocksOf(plan, 'Objectif')[0][0]).toBe('10-20 08:00');
     expect(plan.atRisk.map((r) => r.taskId)).toEqual(['Vraie échéance']);
+  });
+});
+
+describe("jeu d'exemple", () => {
+  const now = new Date('2026-10-19T08:00:00');
+  const firstLaunch = () => {
+    const seed = initialSeed(now);
+    return data({ projects: seed.projects, windows: seed.windows, settings: seed.settings });
+  };
+
+  it("réutilise la liste « Travail » du premier lancement au lieu d'en créer une deuxième", () => {
+    const { data: d, added } = mergeSample(firstLaunch(), sampleData(now));
+    expect(d.projects.map((p) => p.name)).toEqual(['Perso', 'Travail', 'Site web', 'Maison', 'Sport']);
+    expect(d.projects.find((p) => p.name === 'Travail')!.id).toBe('travail');
+    expect(d.tasks.filter((t) => t.projectId === 'travail').map((t) => t.id)).toEqual(['ex-rapport', 'ex-relire', 'ex-mails']);
+    expect(d.tasks.some((t) => t.projectId === 'ex-travail')).toBe(false);
+    // Seuls les éléments ajoutés sont enregistrés, avec leur liste remappée.
+    expect(added.projects.map((p) => p.id)).toEqual(['ex-web', 'ex-maison', 'ex-sport']);
+    expect(added.tasks.find((t) => t.id === 'ex-rapport')!.projectId).toBe('travail');
+  });
+
+  it("charger l'exemple deux fois ne change rien", () => {
+    const once = mergeSample(firstLaunch(), sampleData(now)).data;
+    const twice = mergeSample(once, sampleData(now)).data;
+    expect(twice).toEqual(once);
   });
 });

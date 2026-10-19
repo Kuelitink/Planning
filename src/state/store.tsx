@@ -33,7 +33,7 @@ import { IndexedDBRepository } from '../storage/indexeddb';
 import { hasLog } from '../core/cycle';
 import { mergeDay, type ClueImport, type DayData } from '../core/clue';
 import { CATEGORIES, cycleSettingsOf } from '../core/cycleCatalog';
-import { initialSeed, sampleData } from './defaults';
+import { initialSeed, sampleData, type Sample } from './defaults';
 import { goalDeadlines, goalsOf } from './urgency';
 
 export interface AppData {
@@ -205,6 +205,38 @@ async function loadAll(repo: Repository): Promise<AppData> {
     repo.getSettings(),
   ]);
   return { projects, windows, tasks, events, goals, timeEntries, cycleDays, cycleMarks, settings };
+}
+
+/**
+ * Ajoute le jeu d'exemple aux données. Une liste d'exemple dont le nom existe déjà
+ * (« Travail » du premier lancement) n'est pas recréée : ses tâches rejoignent la
+ * liste existante. Renvoie aussi les éléments à enregistrer.
+ */
+export function mergeSample(data: AppData, sample: Sample): { data: AppData; added: Sample } {
+  const key = (name: string) => name.trim().toLocaleLowerCase();
+  const reused = new Map<ID, ID>();
+  const projects = sample.projects.filter((p) => {
+    if (data.projects.some((x) => x.id === p.id)) return true;
+    const existing = data.projects.find((x) => key(x.name) === key(p.name));
+    if (existing) reused.set(p.id, existing.id);
+    return !existing;
+  });
+  const tasks = sample.tasks.map((t) => {
+    const projectId = t.projectId && reused.get(t.projectId);
+    return projectId ? { ...t, projectId } : t;
+  });
+  const added: Sample = { ...sample, projects, tasks };
+  const merge = <T extends Entity>(list: T[], extra: T[]) => extra.reduce(upsert, list);
+  return {
+    data: {
+      ...data,
+      projects: merge(data.projects, added.projects),
+      tasks: merge(data.tasks, added.tasks),
+      events: merge(data.events, added.events),
+      goals: merge(data.goals, added.goals),
+    },
+    added,
+  };
 }
 
 export function StoreProvider({ children, repository }: { children: ReactNode; repository?: Repository }) {
@@ -610,21 +642,13 @@ export function StoreProvider({ children, repository }: { children: ReactNode; r
   );
 
   const loadSample = useCallback(() => {
-    const sample = sampleData();
-    setData((d) => {
-      const merge = <T extends Entity>(list: T[], extra: T[]) => extra.reduce(upsert, list);
-      return {
-        ...d,
-        projects: merge(d.projects, sample.projects),
-        tasks: merge(d.tasks, sample.tasks),
-        events: merge(d.events, sample.events),
-        goals: merge(d.goals, sample.goals),
-      };
-    });
-    sample.projects.forEach((p) => persist('projects', p));
-    sample.tasks.forEach((t) => persist('tasks', t));
-    sample.events.forEach((e) => persist('events', e));
-    sample.goals.forEach((g) => persist('goals', g));
+    const { data: next, added } = mergeSample(dataRef.current, sampleData());
+    const { projects, tasks, events, goals } = next;
+    setData((d) => ({ ...d, projects, tasks, events, goals }));
+    added.projects.forEach((p) => persist('projects', p));
+    added.tasks.forEach((t) => persist('tasks', t));
+    added.events.forEach((e) => persist('events', e));
+    added.goals.forEach((g) => persist('goals', g));
   }, [persist]);
 
   const value: Store = {
