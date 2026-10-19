@@ -1,9 +1,9 @@
 {
   "name": "planning",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "module",
-  "description": "Application de planning mobile (PWA) : calendrier, to-do, auto-planification, objectifs et chrono.",
+  "description": "Application de planning mobile (PWA) : calendrier, to-do, auto-planification, objectifs, chrono et suivi du cycle.",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
@@ -15,6 +15,7 @@
   "dependencies": {
     "@fontsource/fredoka": "^5.3.0",
     "@fontsource/nunito": "^5.3.0",
+    "fflate": "^0.8.3",
     "idb": "^8.0.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"

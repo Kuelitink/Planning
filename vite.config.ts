@@ -14,7 +14,7 @@ export default defineConfig({
       manifest: {
         name: 'Planning',
         short_name: 'Planning',
-        description: 'Calendrier, to-do, auto-planification, objectifs et chrono.',
+        description: 'Calendrier, to-do, auto-planification, objectifs, chrono et suivi du cycle.',
         lang: 'fr',
         start_url: './',
         scope: './',

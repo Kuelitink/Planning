@@ -4,7 +4,8 @@ import { MemoryRepository } from '../src/storage/memory';
 import { IndexedDBRepository } from '../src/storage/indexeddb';
 import { parseExport, type Repository } from '../src/storage/repository';
 import { DEFAULT_SETTINGS } from '../src/core/types';
-import { touch } from '../src/core/entity';
+import { createEntity, touch } from '../src/core/entity';
+import type { CycleDay } from '../src/core/types';
 import { at, task } from './helpers';
 
 let dbCounter = 0;
@@ -72,5 +73,28 @@ describe('parseExport', () => {
     const data = parseExport({ app: 'planning', version: 1, exportedAt: '', tasks: [] });
     expect(data.goals).toEqual([]);
     expect(data.settings).toEqual(DEFAULT_SETTINGS);
+  });
+});
+
+describe('mise à jour de la base (v1 → v2, mode Cycle)', () => {
+  it('garde les données existantes et ajoute les collections du cycle', async () => {
+    const { openDB } = await import('idb');
+    const name = `upgrade-${++dbCounter}`;
+    const v1 = await openDB(name, 1, {
+      upgrade(db) {
+        for (const c of ['projects', 'windows', 'tasks', 'events', 'goals', 'timeEntries']) db.createObjectStore(c, { keyPath: 'id' });
+        db.createObjectStore('meta');
+      },
+    });
+    await v1.put('tasks', task('Ancienne'));
+    v1.close();
+
+    const repo = new IndexedDBRepository(name);
+    expect((await repo.list('tasks')).map((t) => t.id)).toEqual(['Ancienne']);
+    const day = createEntity<CycleDay>({ date: '2026-10-01', flow: 'medium', options: { pain: ['period_cramps'] } }, at('2026-10-01 08:00'), '2026-10-01');
+    await repo.putMany('cycleDays', [day]);
+    const exported = parseExport(JSON.parse(JSON.stringify(await repo.exportAll())));
+    expect(exported.cycleDays).toEqual([day]);
+    expect(exported.cycleMarks).toEqual([]);
   });
 });

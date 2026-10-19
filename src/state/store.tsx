@@ -7,7 +7,22 @@
  */
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import type { CalendarEvent, Entity, Goal, GoalPeriod, ID, ISODate, Project, Settings, Task, TimeEntry, TimeWindow } from '../core/types';
+import type {
+  CalendarEvent,
+  CycleDay,
+  CycleMark,
+  CycleSettings,
+  Entity,
+  Goal,
+  GoalPeriod,
+  ID,
+  ISODate,
+  Project,
+  Settings,
+  Task,
+  TimeEntry,
+  TimeWindow,
+} from '../core/types';
 import { DEFAULT_SETTINGS } from '../core/types';
 import { createEntity, createTask, touch, type NewTask } from '../core/entity';
 import { parseDeadline, schedule, type ScheduleResult } from '../core/scheduler';
@@ -15,6 +30,9 @@ import { activeEntry, entryDuration, startTimer as startEntry, stopTimer as stop
 import { MINUTE, parseDateTime, roundUpToGrid } from '../core/time';
 import type { CollectionName, ExportData, Repository } from '../storage/repository';
 import { IndexedDBRepository } from '../storage/indexeddb';
+import { hasLog } from '../core/cycle';
+import { mergeDay, type ClueImport, type DayData } from '../core/clue';
+import { CATEGORIES, cycleSettingsOf } from '../core/cycleCatalog';
 import { initialSeed, sampleData } from './defaults';
 import { goalDeadlines, goalsOf } from './urgency';
 
@@ -25,6 +43,8 @@ export interface AppData {
   events: CalendarEvent[];
   goals: Goal[];
   timeEntries: TimeEntry[];
+  cycleDays: CycleDay[];
+  cycleMarks: CycleMark[];
   settings: Settings;
 }
 
@@ -70,13 +90,33 @@ export interface Store extends AppData {
   /** Temps passé sur une tâche, en ms. */
   timeSpent(taskId: ID, now?: Date): number;
 
+  /** Enregistre ce qui est noté un jour (supprime le jour s'il ne reste rien). */
+  saveCycleDay(day: DayData): void;
+  /** Exclut un cycle des prédictions et/ou l'annote. */
+  setCycleMark(startDate: ISODate, changes: { excluded?: boolean; note?: string }): void;
+  updateCycleSettings(changes: Partial<CycleSettings>): void;
+  /** Ajoute des données Clue aux données du cycle (fusion jour par jour). */
+  importCycle(data: ClueImport): Promise<void>;
+  /** Efface toutes les données du cycle (jours et annotations). */
+  clearCycle(): Promise<void>;
+
   updateSettings(changes: Partial<Settings>): void;
   exportData(): Promise<ExportData>;
   importData(data: ExportData, mode: 'replace' | 'merge'): Promise<void>;
   loadSample(): void;
 }
 
-const EMPTY: AppData = { projects: [], windows: [], tasks: [], events: [], goals: [], timeEntries: [], settings: DEFAULT_SETTINGS };
+const EMPTY: AppData = {
+  projects: [],
+  windows: [],
+  tasks: [],
+  events: [],
+  goals: [],
+  timeEntries: [],
+  cycleDays: [],
+  cycleMarks: [],
+  settings: DEFAULT_SETTINGS,
+};
 const EMPTY_PLAN: ScheduleResult = { blocks: [], unscheduled: [], atRisk: [] };
 /** Au retour dans l'app, on replanifie si le dernier calcul a plus de 15 min. */
 const STALE_MS = 15 * MINUTE;
@@ -151,6 +191,22 @@ export function computePlan(data: AppData, now: Date): ScheduleResult {
   return atRisk.length === result.atRisk.length ? result : { ...result, atRisk };
 }
 
+/** Toutes les données du dépôt. */
+async function loadAll(repo: Repository): Promise<AppData> {
+  const [projects, windows, tasks, events, goals, timeEntries, cycleDays, cycleMarks, settings] = await Promise.all([
+    repo.list('projects'),
+    repo.list('windows'),
+    repo.list('tasks'),
+    repo.list('events'),
+    repo.list('goals'),
+    repo.list('timeEntries'),
+    repo.list('cycleDays'),
+    repo.list('cycleMarks'),
+    repo.getSettings(),
+  ]);
+  return { projects, windows, tasks, events, goals, timeEntries, cycleDays, cycleMarks, settings };
+}
+
 export function StoreProvider({ children, repository }: { children: ReactNode; repository?: Repository }) {
   const repo = useMemo(() => repository ?? new IndexedDBRepository(), [repository]);
   const [data, setData] = useState<AppData>(EMPTY);
@@ -176,16 +232,9 @@ export function StoreProvider({ children, repository }: { children: ReactNode; r
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [projects, windows, tasks, events, goals, timeEntries, savedSettings] = await Promise.all([
-        repo.list('projects'),
-        repo.list('windows'),
-        repo.list('tasks'),
-        repo.list('events'),
-        repo.list('goals'),
-        repo.list('timeEntries'),
-        repo.getSettings(),
-      ]);
-      let next: AppData = { projects, windows, tasks, events, goals, timeEntries, settings: savedSettings };
+      const loaded = await loadAll(repo);
+      const { projects, windows, settings: savedSettings } = loaded;
+      let next: AppData = loaded;
       if (!savedSettings.updatedAt && projects.length === 0 && windows.length === 0) {
         const seed = initialSeed();
         next = { ...next, projects: seed.projects, windows: seed.windows, settings: seed.settings };
@@ -446,27 +495,115 @@ export function StoreProvider({ children, repository }: { children: ReactNode; r
   const updateSettings = useCallback(
     (changes: Partial<Settings>) => {
       const settings = { ...dataRef.current.settings, ...changes, updatedAt: new Date().toISOString() };
+      dataRef.current = { ...dataRef.current, settings };
       setData((d) => ({ ...d, settings }));
       repo.saveSettings(settings).catch(console.error);
     },
     [repo],
   );
 
+  // --- Cycle -----------------------------------------------------------------------
+  const saveCycleDay = useCallback(
+    (day: DayData) => {
+      const existing = dataRef.current.cycleDays.find((d) => d.date === day.date);
+      if (!hasLog(day as CycleDay)) {
+        if (!existing) return;
+        dataRef.current = { ...dataRef.current, cycleDays: dataRef.current.cycleDays.filter((d) => d.date !== day.date) };
+        setData((d) => ({ ...d, cycleDays: d.cycleDays.filter((x) => x.date !== day.date) }));
+        unpersist('cycleDays', existing.id);
+        return;
+      }
+      // Le jour enregistré remplace entièrement le précédent (un champ vidé disparaît).
+      const saved = existing
+        ? { ...day, id: existing.id, createdAt: existing.createdAt, updatedAt: new Date().toISOString() }
+        : createEntity<CycleDay>(day, new Date(), day.date);
+      dataRef.current = { ...dataRef.current, cycleDays: upsert(dataRef.current.cycleDays, saved) };
+      setData((d) => ({ ...d, cycleDays: upsert(d.cycleDays, saved) }));
+      persist('cycleDays', saved);
+    },
+    [persist, unpersist],
+  );
+
+  const setCycleMark = useCallback(
+    (startDate: ISODate, changes: { excluded?: boolean; note?: string }) => {
+      const existing = dataRef.current.cycleMarks.find((m) => m.startDate === startDate);
+      const next = { startDate, excluded: false, ...(existing && { excluded: existing.excluded, note: existing.note }), ...changes };
+      const note = next.note?.trim() || undefined;
+      if (!next.excluded && !note) {
+        if (!existing) return;
+        dataRef.current = { ...dataRef.current, cycleMarks: dataRef.current.cycleMarks.filter((m) => m.id !== existing.id) };
+        setData((d) => ({ ...d, cycleMarks: d.cycleMarks.filter((m) => m.id !== existing.id) }));
+        unpersist('cycleMarks', existing.id);
+        return;
+      }
+      const fields = { startDate, excluded: next.excluded, note };
+      const saved = existing ? touch(existing, fields) : createEntity<CycleMark>(fields, new Date(), startDate);
+      dataRef.current = { ...dataRef.current, cycleMarks: upsert(dataRef.current.cycleMarks, saved) };
+      setData((d) => ({ ...d, cycleMarks: upsert(d.cycleMarks, saved) }));
+      persist('cycleMarks', saved);
+    },
+    [persist, unpersist],
+  );
+
+  const updateCycleSettings = useCallback(
+    (changes: Partial<CycleSettings>) => updateSettings({ cycle: { ...cycleSettingsOf(dataRef.current.settings), ...changes } }),
+    [updateSettings],
+  );
+
+  const importCycle = useCallback(
+    async (imported: ClueImport) => {
+      const now = new Date();
+      const byDate = new Map(dataRef.current.cycleDays.map((d) => [d.date, d]));
+      const days = imported.days.map((incoming) => {
+        const existing = byDate.get(incoming.date);
+        const merged = mergeDay(existing, incoming);
+        return existing ? touch(existing, merged, now) : createEntity<CycleDay>(merged, now, incoming.date);
+      });
+      const marksByStart = new Map(dataRef.current.cycleMarks.map((m) => [m.startDate, m]));
+      const marks = imported.marks.map((m) => {
+        const existing = marksByStart.get(m.startDate);
+        // Une note ajoutée ici n'est pas effacée par un cycle sans note dans Clue.
+        return existing ? touch(existing, { ...m, note: m.note ?? existing.note }, now) : createEntity<CycleMark>(m, now, m.startDate);
+      });
+      await repo.putMany('cycleDays', days);
+      await repo.putMany('cycleMarks', marks);
+      const merge = <T extends Entity>(list: T[], extra: T[]) => extra.reduce(upsert, list);
+      dataRef.current = {
+        ...dataRef.current,
+        cycleDays: merge(dataRef.current.cycleDays, days),
+        cycleMarks: merge(dataRef.current.cycleMarks, marks),
+      };
+      setData((d) => ({ ...d, cycleDays: merge(d.cycleDays, days), cycleMarks: merge(d.cycleMarks, marks) }));
+      const current = cycleSettingsOf(dataRef.current.settings);
+      const { customTags, categories, ...rest } = imported.settings;
+      // Catégories et étiquettes : celles déjà suivies plus celles de Clue, dans l'ordre du catalogue.
+      const order = (k: string) => {
+        const i = CATEGORIES.findIndex((c) => c.key === k);
+        return i < 0 ? CATEGORIES.length : i;
+      };
+      const allCategories = [...new Set([...current.categories, ...(categories ?? [])])].sort((a, b) => order(a) - order(b));
+      updateCycleSettings({
+        ...rest,
+        categories: allCategories,
+        customTags: [...new Set([...current.customTags, ...(customTags ?? [])])],
+      });
+    },
+    [repo, updateCycleSettings],
+  );
+
+  const clearCycle = useCallback(async () => {
+    const { cycleDays, cycleMarks } = dataRef.current;
+    await Promise.all([...cycleDays.map((d) => repo.remove('cycleDays', d.id)), ...cycleMarks.map((m) => repo.remove('cycleMarks', m.id))]);
+    dataRef.current = { ...dataRef.current, cycleDays: [], cycleMarks: [] };
+    setData((d) => ({ ...d, cycleDays: [], cycleMarks: [] }));
+  }, [repo]);
+
   const exportData = useCallback(() => repo.exportAll(), [repo]);
 
   const importData = useCallback(
     async (incoming: ExportData, mode: 'replace' | 'merge') => {
       await repo.importAll(incoming, mode);
-      const [projects, windows, tasks, events, goals, timeEntries, settings] = await Promise.all([
-        repo.list('projects'),
-        repo.list('windows'),
-        repo.list('tasks'),
-        repo.list('events'),
-        repo.list('goals'),
-        repo.list('timeEntries'),
-        repo.getSettings(),
-      ]);
-      setData({ projects, windows, tasks, events, goals, timeEntries, settings });
+      setData(await loadAll(repo));
     },
     [repo],
   );
@@ -516,6 +653,11 @@ export function StoreProvider({ children, repository }: { children: ReactNode; r
     pauseTimer,
     finishTimer,
     timeSpent,
+    saveCycleDay,
+    setCycleMark,
+    updateCycleSettings,
+    importCycle,
+    clearCycle,
     updateSettings,
     exportData,
     importData,

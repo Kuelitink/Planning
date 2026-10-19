@@ -244,7 +244,7 @@ export function SettingsMode() {
         </div>
       </Section>
 
-      <p style={{ margin: '32px 0 0', textAlign: 'center', fontSize: 13, color: 'var(--faint)' }}>Planning — v0.2</p>
+      <p style={{ margin: '32px 0 0', textAlign: 'center', fontSize: 13, color: 'var(--faint)' }}>Planning — v0.3</p>
       {period && <PeriodSheet key={period.id ?? 'new'} periodId={period.id} onClose={() => setPeriod(null)} />}
     </>
   );

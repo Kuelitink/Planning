@@ -20,10 +20,13 @@ interface PlanningDB extends DBSchema {
   events: { key: string; value: Collections['events'] };
   goals: { key: string; value: Collections['goals'] };
   timeEntries: { key: string; value: Collections['timeEntries'] };
+  cycleDays: { key: string; value: Collections['cycleDays'] };
+  cycleMarks: { key: string; value: Collections['cycleMarks'] };
   meta: { key: string; value: unknown };
 }
 
-const DB_VERSION = 1;
+/** 2 : collections du mode Cycle (créées à la mise à jour, sans toucher aux autres). */
+const DB_VERSION = 2;
 const SETTINGS_KEY = 'settings';
 
 /** Stockage local sur l'appareil (IndexedDB). */
@@ -49,6 +52,12 @@ export class IndexedDBRepository implements Repository {
 
   async put<K extends CollectionName>(collection: K, item: Collections[K]): Promise<void> {
     await (await this.db).put(collection, item as never);
+  }
+
+  async putMany<K extends CollectionName>(collection: K, items: Collections[K][]): Promise<void> {
+    const tx = (await this.db).transaction(collection, 'readwrite');
+    for (const item of items) void tx.store.put(item as never);
+    await tx.done;
   }
 
   async remove(collection: CollectionName, id: ID): Promise<void> {

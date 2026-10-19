@@ -4,7 +4,7 @@
  * branchée plus tard derrière la même interface.
  */
 
-import type { CalendarEvent, Goal, ID, Project, Settings, Task, TimeEntry, TimeWindow } from '../core/types';
+import type { CalendarEvent, CycleDay, CycleMark, Goal, ID, Project, Settings, Task, TimeEntry, TimeWindow } from '../core/types';
 import { DEFAULT_SETTINGS } from '../core/types';
 
 export interface Collections {
@@ -14,16 +14,21 @@ export interface Collections {
   events: CalendarEvent;
   goals: Goal;
   timeEntries: TimeEntry;
+  /** Mode Cycle : un enregistrement par jour noté, et les annotations de cycles. */
+  cycleDays: CycleDay;
+  cycleMarks: CycleMark;
 }
 
 export type CollectionName = keyof Collections;
 
-export const COLLECTIONS: CollectionName[] = ['projects', 'windows', 'tasks', 'events', 'goals', 'timeEntries'];
+export const COLLECTIONS: CollectionName[] = ['projects', 'windows', 'tasks', 'events', 'goals', 'timeEntries', 'cycleDays', 'cycleMarks'];
 
 export interface Repository {
   list<K extends CollectionName>(collection: K): Promise<Collections[K][]>;
   get<K extends CollectionName>(collection: K, id: ID): Promise<Collections[K] | undefined>;
   put<K extends CollectionName>(collection: K, item: Collections[K]): Promise<void>;
+  /** Écrit plusieurs éléments d'un coup (une seule transaction). */
+  putMany<K extends CollectionName>(collection: K, items: Collections[K][]): Promise<void>;
   remove(collection: CollectionName, id: ID): Promise<void>;
   getSettings(): Promise<Settings>;
   saveSettings(settings: Settings): Promise<void>;
