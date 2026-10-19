@@ -4,6 +4,8 @@ import { useId, useRef, useState, type ReactNode } from 'react';
 import { toISODate } from '../core/time';
 import { parseExport } from '../storage/repository';
 import { canShareFiles, downloadFile, shareFiles } from '../ui/share';
+import { formatDeadline } from '../ui/format';
+import { useSync } from '../state/sync';
 import { useStore } from '../state/store';
 import { MODE_LABEL, MODES, useNav, type Mode } from '../state/nav';
 import { Field, Header, MODE_ICON } from '../ui/kit';
@@ -65,6 +67,7 @@ function ModeSwitch({ mode, checked, disabled, onChange }: { mode: Mode; checked
 export function SettingsMode() {
   const { windows, settings, updateSettings, exportData, importData, loadSample } = useStore();
   const { visibleModes, setVisibleModes, openSheet, showToast } = useNav();
+  const { status: sync } = useSync();
   const fileRef = useRef<HTMLInputElement>(null);
   const ids = { def: useId(), buffer: useId(), horizon: useId() };
   /** Période spéciale ouverte : `{}` = nouvelle, `{ id }` = édition. */
@@ -220,6 +223,21 @@ export function SettingsMode() {
       </Section>
 
       <Section title="Données">
+        <button type="button" style={rowButton} onClick={() => openSheet({ kind: 'githubSync' })}>
+          <span style={{ flex: 1, minWidth: 0 }}>
+            <span style={{ display: 'block', fontSize: 16, fontWeight: 600 }}>Sauvegarde GitHub</span>
+            <span style={{ display: 'block', fontSize: 13, color: sync.lastError ? 'var(--danger)' : 'var(--muted)', marginTop: 2 }}>
+              {!sync.configured
+                ? 'Chiffrée et automatique, dans un dépôt privé'
+                : sync.lastError
+                  ? sync.lastError
+                  : `${sync.repoName} · ${sync.busy ? 'envoi…' : sync.lastPushAt ? `envoyée ${formatDeadline(sync.lastPushAt).toLowerCase()}` : 'pas encore envoyée'}${sync.auto ? '' : ' · manuelle'}`}
+            </span>
+          </span>
+          <span style={{ color: 'var(--faint)', display: 'inline-flex' }}>
+            <IconChevronRight size={18} />
+          </span>
+        </button>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '16px 0' }}>
           <button type="button" className="btn btn--secondary btn--block" onClick={() => void doShare()}>
             Sauvegarder sur Drive ou partager

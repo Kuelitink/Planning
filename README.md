@@ -6,7 +6,8 @@ dépendances, horaires autorisés), listes/projets, objectifs du jour/semaine/mo
 du cycle menstruel façon Clue (avec import des données Clue).
 
 Hébergée gratuitement sur GitHub Pages ; les données restent sur l'appareil (IndexedDB),
-avec export/import JSON pour les sauvegardes (à envoyer sur Drive par le menu de partage).
+avec export/import JSON (à envoyer sur Drive par le menu de partage) et une sauvegarde
+automatique chiffrée dans un dépôt GitHub privé.
 
 **En ligne :** https://kuelitink.github.io/Planning/
 
@@ -36,6 +37,7 @@ node scripts/gen-icons.mjs  # régénère les icônes PNG
     `cycleCatalog.ts` catégories de suivi ; `insights.ts` analyses détaillées ; `reminders.ts` rappels ;
     `clue.ts` import des exports Clue ; `clueExport.ts` export au même format ; `zip.ts` lecture des zip chiffrés (ZipCrypto).
 - `src/storage/` — interface `Repository` (IndexedDB, mémoire), export/import JSON.
+- `src/sync/` — sauvegarde chiffrée sur GitHub (chiffrement, API « contents », envoi/restauration).
 - `src/state/` — état React : `store.tsx` (données, plan, chrono, cycle), `cycle.ts` (prédictions
   du jour, notifications), `nav.tsx` (modes, feuilles),
   `defaults.ts` (premier lancement, exemple), `urgency.ts` (objectifs, tri par urgence, recherche).
@@ -80,6 +82,20 @@ Suivi du cycle menstruel inspiré de Clue :
   Drive ou partager » ouvre le menu de partage du téléphone ; sinon, téléchargement du `.zip`.
 
 Les prédictions sont des estimations, pas une méthode de contraception.
+
+## Sauvegarde GitHub (chiffrée)
+
+Réglages › Données › « Sauvegarde GitHub » envoie toutes les données (tâches, calendrier,
+cycle…) dans un fichier `planning-sauvegarde.json` d'un **dépôt privé** (par exemple
+`planning-donnees`), une minute après chaque modification et quand on quitte l'app (tant
+qu'elle est ouverte). Au démarrage, une version envoyée par un autre appareil est fusionnée.
+
+- Chiffrement sur le téléphone avant l'envoi : AES-GCM 256 bits, clé dérivée du mot de passe
+  (PBKDF2-SHA-256, 600 000 itérations). Le mot de passe n'est pas conservé ; sans lui, la
+  sauvegarde est illisible.
+- Accès par une clé « fine-grained » limitée au dépôt (Contents : Read and write), gardée sur
+  l'appareil seulement (jamais dans les exports). L'app refuse un dépôt public.
+- Code : `src/sync/` (chiffrement, API GitHub, envoi et restauration) et `src/state/sync.tsx`.
 
 ## Déploiement sur GitHub Pages
 

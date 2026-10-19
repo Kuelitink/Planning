@@ -36,7 +36,9 @@ export type SheetState =
   | { kind: 'cycleInsight'; topic: InsightTopic }
   | { kind: 'cycleSettings' }
   | { kind: 'cycleImport' }
-  | { kind: 'cycleExport' };
+  | { kind: 'cycleExport' }
+  /** Sauvegarde chiffrée sur GitHub. */
+  | { kind: 'githubSync' };
 
 export interface Toast {
   message: string;

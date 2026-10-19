@@ -20,6 +20,8 @@ import { CycleSettingsSheet } from './sheets/CycleSettingsSheet';
 import { CycleImportSheet } from './sheets/CycleImportSheet';
 import { CycleInsightSheet } from './sheets/CycleInsightSheet';
 import { CycleExportSheet } from './sheets/CycleExportSheet';
+import { GitHubSyncSheet } from './sheets/GitHubSyncSheet';
+import { SyncProvider } from './state/sync';
 import { useCycleNotifications } from './state/cycle';
 
 function CurrentMode() {
@@ -70,6 +72,8 @@ function CurrentSheet() {
       return <CycleImportSheet onClose={closeSheet} />;
     case 'cycleExport':
       return <CycleExportSheet onClose={closeSheet} />;
+    case 'githubSync':
+      return <GitHubSyncSheet onClose={closeSheet} />;
   }
 }
 
@@ -99,7 +103,9 @@ export function App() {
   return (
     <StoreProvider>
       <NavProvider>
-        <Shell />
+        <SyncProvider>
+          <Shell />
+        </SyncProvider>
       </NavProvider>
     </StoreProvider>
   );
