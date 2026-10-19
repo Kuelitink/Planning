@@ -35,7 +35,8 @@ export type SheetState =
   | { kind: 'cycle'; start: ISODate }
   | { kind: 'cycleInsight'; topic: InsightTopic }
   | { kind: 'cycleSettings' }
-  | { kind: 'cycleImport' };
+  | { kind: 'cycleImport' }
+  | { kind: 'cycleExport' };
 
 export interface Toast {
   message: string;

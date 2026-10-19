@@ -19,6 +19,7 @@ import { CycleSheet } from './sheets/CycleSheet';
 import { CycleSettingsSheet } from './sheets/CycleSettingsSheet';
 import { CycleImportSheet } from './sheets/CycleImportSheet';
 import { CycleInsightSheet } from './sheets/CycleInsightSheet';
+import { CycleExportSheet } from './sheets/CycleExportSheet';
 import { useCycleNotifications } from './state/cycle';
 
 function CurrentMode() {
@@ -67,6 +68,8 @@ function CurrentSheet() {
       return <CycleSettingsSheet onClose={closeSheet} />;
     case 'cycleImport':
       return <CycleImportSheet onClose={closeSheet} />;
+    case 'cycleExport':
+      return <CycleExportSheet onClose={closeSheet} />;
   }
 }
 

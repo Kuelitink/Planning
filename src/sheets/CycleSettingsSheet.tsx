@@ -226,6 +226,14 @@ export function CycleSettingsSheet({ onClose }: { onClose: () => void }) {
             <IconUpload size={18} />
             Importer depuis Clue
           </button>
+          <button
+            type="button"
+            className="btn btn--secondary btn--block"
+            disabled={cycleDays.length === 0}
+            onClick={() => openSheet({ kind: 'cycleExport' })}
+          >
+            Exporter au format Clue
+          </button>
           <button type="button" className="btn btn--danger btn--block" disabled={cycleDays.length === 0} onClick={() => void clear()}>
             Effacer les données du cycle
           </button>

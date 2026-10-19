@@ -3,6 +3,7 @@
 import { useId, useRef, useState, type ReactNode } from 'react';
 import { toISODate } from '../core/time';
 import { parseExport } from '../storage/repository';
+import { canShareFiles, downloadFile, shareFiles } from '../ui/share';
 import { useStore } from '../state/store';
 import { MODE_LABEL, MODES, useNav, type Mode } from '../state/nav';
 import { Field, Header, MODE_ICON } from '../ui/kit';
@@ -77,19 +78,30 @@ export function SettingsMode() {
   const sortedWindows = [...windows].sort((a, b) => a.name.localeCompare(b.name, 'fr'));
   const periods = upcomingPeriods(windows);
 
+  /** Sauvegarde complète (toutes les données, cycle compris), réimportable avec « Importer ». */
+  const exportFile = async () => {
+    const data = await exportData();
+    return new File([JSON.stringify(data, null, 2)], `planning-${toISODate(new Date())}.json`, { type: 'application/json' });
+  };
+
   const doExport = async () => {
     try {
-      const data = await exportData();
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `planning-${toISODate(new Date())}.json`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      downloadFile(await exportFile());
       showToast({ message: 'Export téléchargé' });
+    } catch (err) {
+      console.error(err);
+      showToast({ message: "L'export a échoué." });
+    }
+  };
+
+  /** Menu de partage du téléphone : Enregistrer dans Drive, Fichiers, e-mail… */
+  const doShare = async () => {
+    try {
+      const file = await exportFile();
+      if (!canShareFiles([file])) {
+        downloadFile(file);
+        showToast({ message: 'Partage indisponible ici : export téléchargé' });
+      } else if (await shareFiles([file], 'Sauvegarde Planning')) showToast({ message: 'Sauvegarde envoyée' });
     } catch (err) {
       console.error(err);
       showToast({ message: "L'export a échoué." });
@@ -209,8 +221,11 @@ export function SettingsMode() {
 
       <Section title="Données">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '16px 0' }}>
-          <button type="button" className="btn btn--secondary btn--block" onClick={doExport}>
-            Exporter
+          <button type="button" className="btn btn--secondary btn--block" onClick={() => void doShare()}>
+            Sauvegarder sur Drive ou partager
+          </button>
+          <button type="button" className="btn btn--secondary btn--block" onClick={() => void doExport()}>
+            Télécharger l'export
           </button>
           <button type="button" className="btn btn--secondary btn--block" onClick={() => fileRef.current?.click()}>
             Importer
@@ -239,7 +254,8 @@ export function SettingsMode() {
             Charger un exemple
           </button>
           <p style={{ margin: '4px 2px 0', fontSize: 13, color: 'var(--muted)', lineHeight: 1.4 }}>
-            Les données restent sur ce téléphone. Exporte-les de temps en temps.
+            Les données restent sur ce téléphone. Sauvegarde-les de temps en temps : le fichier (cycle compris) se réimporte avec
+            « Importer ». Pour le cycle seul au format Clue : onglet Cycle › réglages › Exporter au format Clue.
           </p>
         </div>
       </Section>

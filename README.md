@@ -6,7 +6,7 @@ dépendances, horaires autorisés), listes/projets, objectifs du jour/semaine/mo
 du cycle menstruel façon Clue (avec import des données Clue).
 
 Hébergée gratuitement sur GitHub Pages ; les données restent sur l'appareil (IndexedDB),
-avec export/import JSON pour les sauvegardes.
+avec export/import JSON pour les sauvegardes (à envoyer sur Drive par le menu de partage).
 
 **En ligne :** https://kuelitink.github.io/Planning/
 
@@ -34,7 +34,7 @@ node scripts/gen-icons.mjs  # régénère les icônes PNG
   - `time.ts`, `intervals.ts`, `windows.ts`, `events.ts` utilitaires (heure locale, récurrences) ;
   - `cycle.ts` cycles, moyennes et prédictions (règles de calcul en tête du fichier) ;
     `cycleCatalog.ts` catégories de suivi ; `insights.ts` analyses détaillées ; `reminders.ts` rappels ;
-    `clue.ts` import des exports Clue ; `zip.ts` lecture des zip chiffrés (ZipCrypto).
+    `clue.ts` import des exports Clue ; `clueExport.ts` export au même format ; `zip.ts` lecture des zip chiffrés (ZipCrypto).
 - `src/storage/` — interface `Repository` (IndexedDB, mémoire), export/import JSON.
 - `src/state/` — état React : `store.tsx` (données, plan, chrono, cycle), `cycle.ts` (prédictions
   du jour, notifications), `nav.tsx` (modes, feuilles),
@@ -74,6 +74,10 @@ Suivi du cycle menstruel inspiré de Clue :
   Clue », choisir le `.zip` (ou les `.json` qu'il contient, ou une ancienne sauvegarde
   `.cluedata`) et saisir le mot de passe. Mesures, cycles exclus et notes, durées, affichage,
   étiquettes et rappels sont repris. Le fichier est lu sur le téléphone : rien n'est envoyé.
+- **Export au format Clue** : réglages du cycle › « Exporter au format Clue » crée le même dossier
+  `ClueDataDownload-…` (`measurements.json`, `cycle_attributes.json`, `profile.json`…), non
+  chiffré, réimportable ici ou dans une autre appli qui lit les exports Clue. « Enregistrer sur
+  Drive ou partager » ouvre le menu de partage du téléphone ; sinon, téléchargement du `.zip`.
 
 Les prédictions sont des estimations, pas une méthode de contraception.
 

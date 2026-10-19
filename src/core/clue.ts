@@ -266,7 +266,11 @@ function readNotifications(raw: Raw, settings: Partial<CycleSettings>) {
         if (time && /^\d{2}:\d{2}$/.test(time)) settings.checkInTime = time;
         break;
       case 'reminder_period_coming_soon':
-        settings.remindPeriodDays = 2;
+        // `DaysBefore` : ajouté par l'export de Planning (Clue ne le donne pas, 2 jours par défaut).
+        settings.remindPeriodDays = num(n.DaysBefore) ?? 2;
+        break;
+      case 'reminder_pms':
+        settings.remindPms = true;
         break;
       case 'reminder_fertile_window_starting_soon':
         settings.remindFertile = true;
