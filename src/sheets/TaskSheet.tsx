@@ -290,7 +290,7 @@ export function TaskSheet({ id, defaults, onClose }: { id?: ID; defaults?: Parti
             width: '100%',
             marginTop: 12,
             padding: 12,
-            border: '1px solid var(--line)',
+            border: 'var(--stroke)',
             borderRadius: 14,
             background: 'var(--card)',
             fontSize: 15,

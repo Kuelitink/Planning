@@ -52,7 +52,7 @@ function ListOverview() {
                 <button
                   type="button"
                   className="row"
-                  style={{ width: '100%', border: 'none', textAlign: 'left' }}
+                  style={{ width: '100%', textAlign: 'left' }}
                   onClick={() => setOpenListId(r.id)}
                   aria-label={`${r.name}, ${count} à faire`}
                 >

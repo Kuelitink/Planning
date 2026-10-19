@@ -62,7 +62,7 @@ export function periodLabel(period: GoalPeriod, periodStart: string, now = new D
   return `Semaine ${isoWeek(start)} · ${range}`;
 }
 
-/** Sélecteur de période pleine largeur (pilule blanche, actif en noir). */
+/** Sélecteur de période pleine largeur (pilule blanche cernée, actif en rose). */
 export function PeriodPicker({ value, onChange }: { value: GoalPeriod; onChange: (p: GoalPeriod) => void }) {
   return (
     <div
@@ -70,7 +70,8 @@ export function PeriodPicker({ value, onChange }: { value: GoalPeriod; onChange:
       aria-label="Période"
       style={{
         height: 48,
-        padding: 4,
+        padding: 3,
+        border: 'var(--stroke)',
         background: 'var(--card)',
         borderRadius: 999,
         display: 'grid',
@@ -89,8 +90,10 @@ export function PeriodPicker({ value, onChange }: { value: GoalPeriod; onChange:
             style={{
               border: 'none',
               borderRadius: 999,
-              background: on ? 'var(--primary)' : 'transparent',
-              color: on ? '#fff' : 'var(--muted)',
+              background: on ? 'var(--picked)' : 'transparent',
+              boxShadow: on ? 'inset 0 0 0 1.5px var(--ink)' : undefined,
+              color: on ? 'var(--ink)' : 'var(--muted)',
+              fontFamily: 'var(--font-display)',
               fontSize: 15,
               fontWeight: on ? 600 : 500,
             }}
@@ -105,10 +108,11 @@ export function PeriodPicker({ value, onChange }: { value: GoalPeriod; onChange:
 
 /** Ligne d'objectif : case (priorité), titre (fiche), liste, chrono, retirer. */
 function GoalRow({ task, onRemove }: { task: Task; onRemove: () => void }) {
-  const { projects, setTaskDone } = useStore();
+  const { projects, setTaskDone, active } = useStore();
   const { openSheet, showToast } = useNav();
   const project = task.projectId ? projects.find((p) => p.id === task.projectId) : undefined;
   const done = task.status === 'done';
+  const running = active?.taskId === task.id;
 
   const toggle = (checked: boolean) => {
     setTaskDone(task.id, checked);
@@ -116,7 +120,7 @@ function GoalRow({ task, onRemove }: { task: Task; onRemove: () => void }) {
   };
 
   return (
-    <li className="row" style={{ gap: 12, paddingRight: 8 }}>
+    <li className={running ? 'row row--running' : 'row'} style={{ gap: 12, paddingRight: 8 }}>
       <PriorityCheck
         priority={task.priority}
         checked={done}
@@ -184,7 +188,7 @@ export function GoalsMode() {
       <PeriodPicker value={period} onChange={setPeriod} />
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '12px 0 8px' }}>
-        <button type="button" className="icon-btn" aria-label="Période précédente" onClick={() => setAnchor((d) => shift(d, period, -1))}>
+        <button type="button" className="icon-btn icon-btn--card" aria-label="Période précédente" onClick={() => setAnchor((d) => shift(d, period, -1))}>
           <IconChevronLeft />
         </button>
         <button
@@ -205,7 +209,7 @@ export function GoalsMode() {
         >
           {periodLabel(period, periodStart, now)}
         </button>
-        <button type="button" className="icon-btn" aria-label="Période suivante" onClick={() => setAnchor((d) => shift(d, period, 1))}>
+        <button type="button" className="icon-btn icon-btn--card" aria-label="Période suivante" onClick={() => setAnchor((d) => shift(d, period, 1))}>
           <IconChevronRight />
         </button>
       </div>
