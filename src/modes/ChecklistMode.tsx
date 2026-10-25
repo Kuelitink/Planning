@@ -275,10 +275,16 @@ function ChecklistList({
     updateDrag(e.clientY);
   };
 
+  /** Ignore le clic qui suit un geste (s'il y en a un : sinon le toucher suivant doit marcher). */
+  const swallowNextClick = () => {
+    swallowClick.current = true;
+    window.setTimeout(() => (swallowClick.current = false), 350);
+  };
+
   const onPointerUp = () => {
     const g = gesture.current;
     if (g?.kind === 'swipe') {
-      swallowClick.current = true;
+      swallowNextClick();
       const row = rows[g.index];
       if (g.dx >= SWIPE_PX && canIndent(rows, g.index)) onRows(indentRow(rows, g.index));
       else if (g.dx <= -SWIPE_PX) {
@@ -286,7 +292,7 @@ function ChecklistList({
         else onRemove(row.id);
       }
     } else if (g?.kind === 'drag' && drag) {
-      swallowClick.current = true;
+      swallowNextClick();
       const next = moveRow(rows, g.index, drag.to);
       if (next.some((r, i) => r.id !== rows[i].id || r.depth !== rows[i].depth)) onRows(next);
     }
