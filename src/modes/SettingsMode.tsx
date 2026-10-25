@@ -14,7 +14,7 @@ import { IconChevronRight, IconPlus } from '../ui/icons';
 import { summarizeRules } from '../sheets/RangesEditor';
 import { formatPeriodDates, PeriodSheet, summarizePeriod, upcomingPeriods } from '../sheets/PeriodSheet';
 import { BUILD_NUMBER, isNative } from '../native/platform';
-import { latestApk, RELEASES_PAGE, updateWebApp, type ApkRelease } from '../native/update';
+import { installApk, latestApk, RELEASES_PAGE, updateWebApp, type ApkRelease } from '../native/update';
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -29,12 +29,14 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 
 /**
  * Version et bouton « Mettre à jour l'application » : l'appli web recharge la nouvelle version
- * publiée ; l'appli Android ouvre le téléchargement de la nouvelle APK s'il y en a une.
+ * publiée ; l'appli Android télécharge la nouvelle APK et ouvre l'installateur.
  */
 function AppVersion() {
   const { showToast } = useNav();
   const [update, setUpdate] = useState<ApkRelease | null>(null);
   const [checking, setChecking] = useState(false);
+  /** Avancée du téléchargement de l'APK, en %. */
+  const [progress, setProgress] = useState<number | null>(null);
   useEffect(() => {
     if (!isNative || !BUILD_NUMBER) return;
     let cancelled = false;
@@ -44,6 +46,19 @@ function AppVersion() {
     };
   }, []);
 
+  const install = async (release: ApkRelease) => {
+    setProgress(0);
+    try {
+      const result = await installApk(release, setProgress);
+      if (result === 'permission')
+        showToast({ message: 'Autorise Planning à installer des applis, puis reviens et réappuie sur « Mettre à jour »' });
+      else if (result === 'installing') showToast({ message: `Version n°${release.build} téléchargée : touche « Installer »` });
+      else if (result === 'failed') showToast({ message: 'Téléchargement impossible (pas de réseau ?)' });
+    } finally {
+      setProgress(null);
+    }
+  };
+
   const checkUpdate = async () => {
     setChecking(true);
     try {
@@ -52,8 +67,7 @@ function AppVersion() {
         if (!latest) showToast({ message: 'Vérification impossible (pas de réseau ?)' });
         else if (latest.build > BUILD_NUMBER) {
           setUpdate(latest);
-          window.open(latest.url, '_blank');
-          showToast({ message: `Nouvelle version n°${latest.build} : installe l’APK téléchargée` });
+          await install(latest);
         } else showToast({ message: "L'application est à jour" });
         return;
       }
@@ -79,13 +93,19 @@ function AppVersion() {
         onClick={() => void checkUpdate()}
         style={{ marginBottom: 12, ...(checking ? { opacity: 0.6 } : {}) }}
       >
-        {checking ? 'Recherche d’une mise à jour…' : "Mettre à jour l'application"}
+        {progress !== null
+          ? `Téléchargement… ${progress} %`
+          : checking
+            ? 'Recherche d’une mise à jour…'
+            : "Mettre à jour l'application"}
       </button>
       <p style={{ margin: 0 }}>Planning — v0.3{isNative && BUILD_NUMBER ? ` · appli Android n°${BUILD_NUMBER}` : ''}</p>
       {update && (
         <p style={{ margin: 0 }}>
-          <a href={update.url} target="_blank" rel="noopener" style={linkStyle}>
-            Nouvelle version (n°{update.build}) : télécharger l’APK
+          Nouvelle version disponible (n°{update.build}) : appuie sur « Mettre à jour ».
+          <br />
+          <a href={RELEASES_PAGE} target="_blank" rel="noopener" style={linkStyle}>
+            Page des versions
           </a>
         </p>
       )}

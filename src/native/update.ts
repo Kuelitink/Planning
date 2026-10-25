@@ -4,8 +4,21 @@
  * - Appli web (PWA) : le service worker garde l'appli en cache ; on lui demande de vérifier
  *   s'il existe une nouvelle version sur GitHub Pages, et on recharge la page une fois installée.
  * - Appli Android : chaque push sur `main` publie une APK dans une « release » GitHub
- *   (étiquette `apk-<numéro>`). L'appli compare son numéro à celui de la dernière.
+ *   (étiquette `apk-<numéro>`). L'appli compare son numéro à celui de la dernière, télécharge
+ *   elle-même la nouvelle APK et ouvre l'installateur d'Android (module natif `ApkUpdate`).
+ *   Ouvrir le lien dans Chrome ne suffit pas : Chrome écarte l'APK sans la garder.
  */
+
+import { Capacitor, registerPlugin, type PluginListenerHandle } from '@capacitor/core';
+
+interface ApkUpdatePlugin {
+  canInstall(): Promise<{ allowed: boolean }>;
+  openInstallSettings(): Promise<void>;
+  downloadAndInstall(options: { url: string }): Promise<void>;
+  addListener(event: 'progress', listener: (e: { percent: number }) => void): Promise<PluginListenerHandle>;
+}
+
+const ApkUpdate = registerPlugin<ApkUpdatePlugin>('ApkUpdate');
 
 export const RELEASES_PAGE = 'https://github.com/Kuelitink/Planning/releases/latest';
 const LATEST = 'https://api.github.com/repos/Kuelitink/Planning/releases/latest';
@@ -63,4 +76,36 @@ export async function updateWebApp(): Promise<'updated' | 'current' | 'unavailab
     check();
   });
   return 'updated';
+}
+
+/**
+ * Appli Android : installe la nouvelle APK.
+ * `installing` : l'installateur d'Android est ouvert ; `permission` : il faut d'abord autoriser
+ * Planning à installer des applis (le réglage vient d'être ouvert) ; `browser` : module natif
+ * absent, l'APK est ouverte dans le navigateur ; `failed` : téléchargement impossible.
+ */
+export async function installApk(
+  release: ApkRelease,
+  onProgress: (percent: number) => void,
+): Promise<'installing' | 'permission' | 'browser' | 'failed'> {
+  if (!Capacitor.isPluginAvailable('ApkUpdate')) {
+    window.open(release.url, '_blank');
+    return 'browser';
+  }
+  try {
+    const { allowed } = await ApkUpdate.canInstall();
+    if (!allowed) {
+      await ApkUpdate.openInstallSettings();
+      return 'permission';
+    }
+    const listener = await ApkUpdate.addListener('progress', (e) => onProgress(e.percent));
+    try {
+      await ApkUpdate.downloadAndInstall({ url: release.url });
+    } finally {
+      await listener.remove();
+    }
+    return 'installing';
+  } catch {
+    return 'failed';
+  }
 }
