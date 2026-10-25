@@ -21,7 +21,7 @@
   --p1: #d7263d;
   --p2: #e07a00;
   --p3: #8a4d66;
-  --p4: #b98aa0;
+  --p4: #3d6fe0; /* bleu : priorité basse */
   --font: 'Nunito', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-display: 'Fredoka', 'Nunito', system-ui, sans-serif;
   --safe-top: env(safe-area-inset-top, 0px);
@@ -421,6 +421,73 @@ button {
 .seg button[aria-pressed='true'] {
   background: var(--picked);
   color: var(--ink);
+  box-shadow: inset 0 0 0 1.5px var(--ink);
+}
+
+/* Sélecteur de priorité : bouton teinté (--prio) qui ouvre un petit menu des 4 priorités.
+   Le menu est en position fixe au-dessus de la feuille du bas. */
+.prio-btn {
+  height: 40px;
+  padding: 0 10px 0 12px;
+  border: var(--stroke);
+  border-radius: 999px;
+  background: var(--card);
+  background: color-mix(in srgb, var(--prio, var(--p3)) 16%, var(--card));
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.prio-swatch {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  border-radius: 4px;
+  background: var(--prio, var(--p3));
+}
+
+.prio-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+}
+
+.prio-menu {
+  position: fixed;
+  min-width: 176px;
+  padding: 6px;
+  border: var(--stroke);
+  border-radius: 18px;
+  background: var(--card);
+  box-shadow: 0 12px 32px rgba(58, 15, 36, 0.18);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  animation: fade 0.12s ease-out;
+}
+
+.prio-menu__item {
+  height: 44px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 500;
+  text-align: left;
+}
+
+.prio-menu__item[aria-checked='true'] {
+  background: var(--soft);
+  background: color-mix(in srgb, var(--prio, var(--p3)) 16%, var(--card));
   box-shadow: inset 0 0 0 1.5px var(--ink);
 }
 

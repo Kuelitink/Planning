@@ -114,6 +114,32 @@
   gap: 2px;
 }
 
+/* Phase du cycle : fond teinté de l'en-tête du jour (pas de la grille horaire). */
+.tl__day.cy-day {
+  position: relative;
+  margin: 2px 1px;
+  height: 48px;
+  width: calc(var(--col) - 2px);
+  border: var(--stroke);
+  border-radius: 8px;
+}
+
+.tl__day.cy-day--predicted {
+  border-style: dashed;
+  border-color: var(--cy-period);
+}
+
+.tl__day.cy-day .tl__dow {
+  color: inherit;
+}
+
+.tl__day .cy-ovu {
+  top: 3px;
+  right: 3px;
+  width: 8px;
+  height: 8px;
+}
+
 .tl__dow {
   font-size: 11px;
   font-weight: 700;
@@ -131,8 +157,7 @@
   font-weight: 500;
 }
 
-.tl__num--today,
-.month__num--today {
+.tl__num--today {
   border: var(--stroke);
   background: var(--pop);
   color: var(--ink);
@@ -258,7 +283,6 @@
   line-height: 14px;
   font-weight: 500;
   overflow-wrap: break-word;
-  hyphens: auto;
 }
 
 .tl--wide .tl__title {
@@ -333,6 +357,7 @@
 }
 
 .month__cell {
+  position: relative;
   min-width: 0;
   height: 56px;
   padding: 5px 0 0;
@@ -345,14 +370,44 @@
   gap: 4px;
 }
 
+/* Aujourd'hui : contour prononcé (le padding compense l'épaisseur), sans pastille jaune. */
+.month__cell--today {
+  padding-top: 3.5px;
+  border-width: 3px;
+}
+
+.month__cell--today .cy-ovu {
+  top: 2.5px;
+  right: 2.5px;
+}
+
 .month__cell--outside {
   border-color: transparent;
   background: transparent;
   color: var(--faint);
 }
 
-.month__cell--selected {
+.month__cell--selected:not(.cy-day) {
   background: var(--picked);
+}
+
+/* Jour choisi sur une case colorée par le cycle : anneau framboise autour de la case. */
+.month__cell--selected.cy-day {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* Phases du cycle : les points des tâches gardent un liseré blanc pour rester lisibles. */
+.month__cell.cy-day .month__dot {
+  box-shadow: 0 0 0 1.5px var(--card);
+}
+
+.month__cell.cy-day .month__more {
+  color: var(--ink);
+}
+
+.month__cell.cy-day--period .month__more {
+  color: #fff;
 }
 
 .month__num {

@@ -123,7 +123,7 @@ export function CycleSettingsSheet({ onClose }: { onClose: () => void }) {
         <Switch label="Fenêtre fertile" checked={s.showFertile} onChange={(on) => set({ showFertile: on })} />
         <Switch label="Ovulation" checked={s.showOvulation} onChange={(on) => set({ showOvulation: on })} />
         <Switch label="SPM" checked={s.showPms} onChange={(on) => set({ showPms: on })} />
-        <Switch label="Règles dans le Calendrier" checked={s.onCalendar} onChange={(on) => set({ onCalendar: on })} />
+        <Switch label="Phases du cycle dans le Calendrier" checked={s.onCalendar} onChange={(on) => set({ onCalendar: on })} />
         <p className="cy-foot">Les durées par défaut servent tant que les cycles notés ne suffisent pas à calculer tes moyennes.</p>
       </Group>
 

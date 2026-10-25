@@ -1,8 +1,7 @@
-/** Vue Mois : grille des jours avec points de couleur, agenda du jour choisi dessous. */
+/** Vue Mois : grille des jours avec points de couleur (et phases du cycle), agenda du jour choisi dessous. */
 
 import { useMemo } from 'react';
 import { addDays, formatHM, isSameDay, startOfMonth, startOfWeek, toISODate } from '../../core/time';
-import { dayMarks } from '../../core/cycle';
 import { useCycle } from '../../state/cycle';
 import { useStore } from '../../state/store';
 import { useNav } from '../../state/nav';
@@ -11,6 +10,7 @@ import { IconCalendar } from '../../ui/icons';
 import { formatDayLong } from '../../ui/format';
 import { toneOf } from '../../ui/palette';
 import { WEEKDAY_INITIAL, itemsByDay, type MonthItem } from './shared';
+import { Legend, OvulationDot, dayPhase, describeMark, phaseClass, useCalendarMarks } from '../cycle/shared';
 import '../cycle.css';
 
 /** Points affichés au plus par cellule (au-delà : « +n »). */
@@ -49,13 +49,9 @@ export function MonthView({
     return { days: list, byDay: itemsByDay(plan, tasks, events, gridStart, addDays(gridStart, weeks * 7)) };
   }, [monthKey, settings.weekStartsOn, plan, tasks, events]);
 
-  // Règles notées et prévues, si on a choisi de les voir ici (réglages du cycle).
+  // Phases du cycle (réglage « Phases du cycle dans le Calendrier »), même code couleur que le mode Cycle.
   const cycle = useCycle();
-  const periods = useMemo(() => {
-    if (!cycle.settings.onCalendar || !days.length) return null;
-    const marks = dayMarks([...cycle.byDate.values()], cycle.forecast, cycle.settings, toISODate(days[0]), toISODate(days[days.length - 1]), cycle.today);
-    return new Map([...marks].filter(([, m]) => m.period).map(([d, m]) => [d, m.period]));
-  }, [cycle.settings, cycle.byDate, cycle.forecast, cycle.today, days]);
+  const cycleMarks = useCalendarMarks(toISODate(days[0]), toISODate(days[days.length - 1]));
 
   const colorOf = (projectId?: string) => toneOf(projects.find((p) => p.id === projectId)?.color).dot;
   const dotColor = (item: MonthItem) => (item.kind === 'task' ? colorOf(item.projectId) : EVENT_DOT);
@@ -72,24 +68,27 @@ export function MonthView({
 
       <div className="month__grid">
         {days.map((day) => {
-          const items = byDay.get(toISODate(day)) ?? [];
+          const key = toISODate(day);
+          const items = byDay.get(key) ?? [];
           const outside = day.getMonth() !== monthStart.getMonth();
           const today = isSameDay(day, now);
           const isSelected = isSameDay(day, selected);
-          const cls = ['month__cell', outside && 'month__cell--outside', isSelected && 'month__cell--selected'].filter(Boolean).join(' ');
+          // Les jours des mois voisins restent neutres, comme dans le calendrier du Cycle.
+          const mark = outside ? undefined : cycleMarks?.get(key);
+          const phase = dayPhase(mark);
+          const cycleLabel = phase ? `, ${describeMark(mark, key > cycle.today)}` : '';
+          const cls = ['month__cell', outside && 'month__cell--outside', isSelected && 'month__cell--selected', today && 'month__cell--today', phaseClass(phase)].filter(Boolean).join(' ');
           return (
             <button
               key={day.getTime()}
               type="button"
               className={cls}
               aria-pressed={isSelected}
-              aria-label={`${formatDayLong(day)}, ${countLabel(items.length)}${periods?.has(toISODate(day)) ? ', règles' : ''}`}
+              aria-label={`${formatDayLong(day)}, ${countLabel(items.length)}${cycleLabel}`}
               onClick={() => onSelect(day)}
             >
-              <span className={today ? 'month__num month__num--today' : 'month__num'}>{day.getDate()}</span>
-              {periods?.has(toISODate(day)) && (
-                <span className={periods.get(toISODate(day)) === 'logged' ? 'month__period' : 'month__period month__period--predicted'} aria-hidden="true" />
-              )}
+              <span className="month__num">{day.getDate()}</span>
+              {phase === 'ovulation' && <OvulationDot />}
               <span className="month__dots" aria-hidden="true">
                 {items.slice(0, shownDots(items.length)).map((item, i) => (
                   <span key={i} className="month__dot" style={{ background: dotColor(item) }} />
@@ -100,6 +99,7 @@ export function MonthView({
           );
         })}
       </div>
+      {cycleMarks && <Legend settings={cycle.settings} variant="planner" />}
 
       <section className="cal-agenda" aria-label={`Agenda du ${formatDayLong(selected)}`}>
         <div className="cal-agenda__head">

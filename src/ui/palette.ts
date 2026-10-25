@@ -33,12 +33,16 @@ export const PRIORITY_COLOR: Record<Priority, string> = {
   1: '#D7263D',
   2: '#E07A00',
   3: '#8A4D66',
-  4: '#B98AA0',
+  4: '#3D6FE0', // bleu (même teinte que la liste « Bleu »)
 };
 
+/** Libellés affichés : la valeur stockée reste 1 (la plus pressante) … 4. */
 export const PRIORITY_LABEL: Record<Priority, string> = {
-  1: 'Urgente',
+  1: 'ASAP',
   2: 'Haute',
   3: 'Normale',
   4: 'Basse',
 };
+
+/** Ordre d'affichage du sélecteur. */
+export const PRIORITIES: Priority[] = [1, 2, 3, 4];

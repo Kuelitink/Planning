@@ -57,7 +57,8 @@ export function sampleData(now = new Date()): Sample {
     p('maison', 'Maison', 2, 12),
     p('sport', 'Sport', 3, 13, 'soir'),
   ];
-  const t = (id: string, fields: Parameters<typeof createTask>[0]) => createTask(fields, now, `ex-${id}`);
+  // Exemples d'un seul tenant sauf mention contraire (une nouvelle tâche, elle, est découpable).
+  const t = (id: string, fields: Parameters<typeof createTask>[0]) => createTask({ splittable: false, ...fields }, now, `ex-${id}`);
   const tasks = [
     t('rapport', { title: 'Rédiger le rapport mensuel', projectId: 'ex-travail', priority: 1, durationMin: 90, deadline: day(1), splittable: true, minChunkMin: 30 }),
     t('relire', { title: 'Relire et envoyer le rapport', projectId: 'ex-travail', priority: 2, durationMin: 30, dependsOn: ['ex-rapport'], deadline: day(1) }),

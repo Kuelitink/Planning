@@ -1,8 +1,9 @@
 /** Outils partagés par les vues du mode Cycle. */
 
-import type { CSSProperties } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import type { CycleDay, CycleSettings, ISODate } from '../../core/types';
-import type { DayMark, Phase } from '../../core/cycle';
+import { dayMarks, type DayMark, type Phase } from '../../core/cycle';
+import { useCycle } from '../../state/cycle';
 import { CATEGORY_BY_KEY, FLOW_LABEL, categoryLabel, optionLabel } from '../../core/cycleCatalog';
 import { formatDuration, parseISODate } from '../../core/time';
 import { formatDayMonth, formatDayShort } from '../../ui/format';
@@ -50,18 +51,41 @@ export function relativeDays(n: number): string {
   return n > 0 ? `dans ${plural(n, 'jour')}` : `il y a ${plural(-n, 'jour')}`;
 }
 
-/** Classes de la pastille d'un jour. */
-export function numClass(mark: DayMark | undefined, isToday: boolean): string {
-  const cls = ['cy-num'];
-  if (mark?.period === 'logged') cls.push('cy-num--period');
-  else if (mark?.period === 'predicted') cls.push('cy-num--predicted');
-  else if (mark?.ovulation) cls.push('cy-num--ovulation');
-  else if (mark?.fertile) cls.push('cy-num--fertile');
-  else if (mark?.pms) cls.push('cy-num--pms');
-  if (mark?.spotting && !mark.period) cls.push('cy-num--spotting');
-  if (cls.length === 1) cls.push('cy-num--plain');
-  if (isToday) cls.push('cy-num--today');
-  return cls.join(' ');
+/**
+ * Phase affichée pour un jour, de la plus importante à la moins importante. Partagée par
+ * l'anneau, le calendrier du Cycle, le Calendrier et la légende : même code couleur partout.
+ * `dayMarks` ne marque déjà que ce que les réglages affichent (fertile, ovulation, SPM).
+ */
+export type DayPhase = 'period' | 'predicted' | 'ovulation' | 'fertile' | 'pms';
+
+export function dayPhase(mark: DayMark | undefined): DayPhase | undefined {
+  if (mark?.period === 'logged') return 'period';
+  if (mark?.period === 'predicted') return 'predicted';
+  if (mark?.ovulation) return 'ovulation';
+  if (mark?.fertile) return 'fertile';
+  if (mark?.pms) return 'pms';
+  return undefined;
+}
+
+/** Classes du fond d'une case selon sa phase (« » si le jour n'en a pas). */
+export function phaseClass(phase: DayPhase | undefined): string {
+  // L'ovulation garde le fond de la fenêtre fertile, avec une pastille en plus.
+  return phase ? `cy-day cy-day--${phase === 'ovulation' ? 'fertile' : phase}` : '';
+}
+
+/** Pastille de l'ovulation estimée (posée dans le coin de la case). */
+export function OvulationDot() {
+  return <span className="cy-ovu" aria-hidden="true" />;
+}
+
+/** Spotting et « jour noté », discrets, sous le numéro. */
+export function DayMarks({ mark }: { mark: DayMark | undefined }) {
+  return (
+    <span className="cy-marks" aria-hidden="true">
+      {mark?.spotting && !mark.period && <span className="cy-spot" />}
+      {mark?.logged && <span className="cy-logdot" />}
+    </span>
+  );
 }
 
 /** « J12 · Fenêtre fertile » */
@@ -127,23 +151,67 @@ export function DayChips({ day, empty = 'Rien de noté.' }: { day?: CycleDay; em
 const SEVERITY_WORD: Record<string, string> = { mild: 'légère', moderate: 'modérée', severe: 'forte', very_severe: 'très forte' };
 export const severityWord = (s: string) => SEVERITY_WORD[s] ?? s;
 
-/** Légende des couleurs. */
-export function Legend({ settings }: { settings: CycleSettings }) {
-  const items = [
-    { label: 'Règles', style: { background: 'var(--cy-period)' } },
-    { label: 'Prévues', style: { background: 'var(--cy-period-soft)', borderStyle: 'dashed', borderColor: 'var(--cy-period)' } },
-    settings.showFertile && { label: 'Fertile', style: { background: 'var(--cy-fertile-soft)' } },
-    settings.showOvulation && { label: 'Ovulation', style: { background: 'var(--cy-fertile)' } },
-    settings.showPms && { label: 'SPM', style: { background: 'var(--cy-pms-soft)' } },
-  ].filter(Boolean) as { label: string; style: CSSProperties }[];
+const PHASE_LEGEND: Record<DayPhase, string> = {
+  period: 'Règles',
+  predicted: 'Règles prévues',
+  fertile: 'Fenêtre fertile',
+  ovulation: 'Ovulation estimée',
+  pms: 'SPM',
+};
+
+/** Échantillon d'une phase, rendu comme une case du calendrier. */
+export function PhaseSwatch({ phase }: { phase?: DayPhase }) {
+  return (
+    <span className={`cy-swatch ${phaseClass(phase)}`} aria-hidden="true">
+      {phase === 'ovulation' && <OvulationDot />}
+    </span>
+  );
+}
+
+/**
+ * Légende des couleurs, avec les mêmes rendus que les cases :
+ * `ring` (anneau), `calendar` (calendrier du Cycle), `planner` (mode Calendrier).
+ */
+export function Legend({ settings, variant }: { settings: CycleSettings; variant: 'ring' | 'calendar' | 'planner' }) {
+  const phases: DayPhase[] = ['period', 'predicted'];
+  if (settings.showFertile) phases.push('fertile');
+  if (settings.showOvulation) phases.push('ovulation');
+  if (settings.showPms) phases.push('pms');
+  const items: { key: string; label: string; swatch: ReactNode }[] = phases.map((p) => ({
+    key: p,
+    label: PHASE_LEGEND[p],
+    swatch: <PhaseSwatch phase={p} />,
+  }));
+  if (variant !== 'planner') {
+    items.push(
+      { key: 'none', label: 'Autres jours', swatch: <PhaseSwatch /> },
+      { key: 'today', label: "Aujourd'hui", swatch: <span className="cy-swatch cy-swatch--today" aria-hidden="true" /> },
+      { key: 'logged', label: 'Jour noté', swatch: <span className="cy-legend__mark" aria-hidden="true"><span className="cy-logdot" /></span> },
+    );
+  }
+  if (variant === 'calendar') {
+    items.push({ key: 'spot', label: 'Spotting', swatch: <span className="cy-legend__mark" aria-hidden="true"><span className="cy-spot" /></span> });
+  }
   return (
     <ul className="cy-legend" aria-label="Légende">
       {items.map((i) => (
-        <li key={i.label}>
-          <span className="cy-swatch" style={i.style} aria-hidden="true" />
+        <li key={i.key}>
+          {i.swatch}
           {i.label}
         </li>
       ))}
     </ul>
   );
+}
+
+/**
+ * Marques du cycle pour le mode Calendrier, de `from` à `to` : `null` si le réglage
+ * « Phases du cycle dans le Calendrier » est coupé ou s'il n'y a pas de règles notées.
+ */
+export function useCalendarMarks(from: ISODate, to: ISODate): Map<ISODate, DayMark> | null {
+  const { settings, byDate, forecast: fc, today } = useCycle();
+  return useMemo(() => {
+    if (!settings.onCalendar || !fc.cycles.length) return null;
+    return dayMarks([...byDate.values()], fc, settings, from, to, today);
+  }, [settings, byDate, fc, from, to, today]);
 }

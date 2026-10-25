@@ -1,14 +1,16 @@
 /** Composants partagés par tous les modes. */
 
-import { useEffect, useId, useState, type CSSProperties, type ReactNode } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import type { ID, Priority } from '../core/types';
 import { formatClock } from '../core/timer';
 import { formatDuration } from '../core/time';
 import { useStore } from '../state/store';
 import { MODE_LABEL, MODES, useNav, type Mode } from '../state/nav';
-import { PRIORITY_COLOR, PRIORITY_LABEL } from './palette';
+import { PRIORITIES, PRIORITY_COLOR, PRIORITY_LABEL } from './palette';
 import {
   IconCalendar,
+  IconCheck,
   IconChecklist,
   IconChevronDown,
   IconDrop,
@@ -263,20 +265,127 @@ export function PlayButton({ taskId, title }: { taskId: ID; title: string }) {
   );
 }
 
-/** Segmenté P1–P4 aux couleurs de priorité. */
+/**
+ * Priorité : un seul bouton aux couleurs de la priorité actuelle ; le toucher ouvre un petit
+ * menu des 4 priorités. Le menu est rendu dans `body` en position fixe, pour ne pas être coupé
+ * par une feuille du bas qui défile ; il s'ouvre sous le bouton, ou au-dessus s'il manque de place.
+ */
 export function PriorityPicker({ value, onChange }: { value: Priority; onChange: (p: Priority) => void }) {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const menuId = useId();
+
+  const close = useCallback(() => {
+    setOpen(false);
+    setPos(null);
+    buttonRef.current?.focus();
+  }, []);
+
+  // Placement d'après le bouton, recalculé si la fenêtre change (clavier Android, rotation).
+  useLayoutEffect(() => {
+    if (!open) return;
+    const place = () => {
+      const button = buttonRef.current;
+      const menu = menuRef.current;
+      if (!button || !menu) return;
+      const r = button.getBoundingClientRect();
+      const margin = 8;
+      const below = r.bottom + 6;
+      const top = below + menu.offsetHeight <= window.innerHeight - margin ? below : Math.max(margin, r.top - 6 - menu.offsetHeight);
+      const left = Math.min(Math.max(margin, r.right - menu.offsetWidth), window.innerWidth - menu.offsetWidth - margin);
+      setPos({ top, left });
+    };
+    place();
+    window.addEventListener('resize', place);
+    return () => window.removeEventListener('resize', place);
+  }, [open]);
+
+  // Une fois placé, le focus va sur la priorité actuelle.
+  useEffect(() => {
+    if (pos) menuRef.current?.querySelector<HTMLElement>('[aria-checked="true"]')?.focus();
+  }, [pos]);
+
+  // Clavier : Échap ferme le menu seulement (capturé avant la feuille), flèches pour circuler.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' || e.key === 'Tab') {
+        e.preventDefault();
+        e.stopPropagation();
+        close();
+        return;
+      }
+      const items = Array.from(menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitemradio"]') ?? []);
+      const i = items.indexOf(document.activeElement as HTMLElement);
+      const next =
+        e.key === 'ArrowDown' ? (i + 1) % items.length
+        : e.key === 'ArrowUp' ? (i - 1 + items.length) % items.length
+        : e.key === 'Home' ? 0
+        : e.key === 'End' ? items.length - 1
+        : -1;
+      if (next < 0) return;
+      e.preventDefault();
+      items[next]?.focus();
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [open, close]);
+
   return (
-    <Segmented<Priority>
-      label="Priorité"
-      value={value}
-      onChange={onChange}
-      options={([1, 2, 3, 4] as Priority[]).map((p) => ({
-        value: p,
-        label: `P${p}`,
-        ariaLabel: `P${p} — ${PRIORITY_LABEL[p]}`,
-        style: p === value ? { background: PRIORITY_COLOR[p], color: '#fff' } : { color: PRIORITY_COLOR[p] },
-      }))}
-    />
+    <>
+      <button
+        ref={buttonRef}
+        type="button"
+        className="prio-btn"
+        style={{ '--prio': PRIORITY_COLOR[value] } as CSSProperties}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-controls={open ? menuId : undefined}
+        aria-label={`Priorité : ${PRIORITY_LABEL[value]}`}
+        onClick={() => (open ? close() : setOpen(true))}
+      >
+        <span className="prio-swatch" aria-hidden="true" />
+        <span>{PRIORITY_LABEL[value]}</span>
+        <IconChevronDown size={16} />
+      </button>
+      {open &&
+        createPortal(
+          <div className="prio-layer" onClick={close}>
+            <div
+              ref={menuRef}
+              id={menuId}
+              className="prio-menu"
+              role="menu"
+              aria-label="Priorité"
+              style={pos ?? { visibility: 'hidden' }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {PRIORITIES.map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={p === value}
+                  tabIndex={-1}
+                  className="prio-menu__item"
+                  style={{ '--prio': PRIORITY_COLOR[p] } as CSSProperties}
+                  onClick={() => {
+                    onChange(p);
+                    close();
+                  }}
+                >
+                  <span className="prio-swatch" aria-hidden="true" />
+                  <span style={{ flex: 1 }}>{PRIORITY_LABEL[p]}</span>
+                  {p === value && <IconCheck size={18} />}
+                </button>
+              ))}
+            </div>
+          </div>,
+          document.body,
+        )}
+    </>
   );
 }
 

@@ -8,12 +8,13 @@ import { formatDeadline } from '../ui/format';
 import { useSync } from '../state/sync';
 import { useStore } from '../state/store';
 import { MODE_LABEL, MODES, useNav, type Mode } from '../state/nav';
+import { cycleSettingsOf } from '../core/cycleCatalog';
 import { Field, Header, MODE_ICON } from '../ui/kit';
 import { IconChevronRight, IconPlus } from '../ui/icons';
 import { summarizeRules } from '../sheets/RangesEditor';
 import { formatPeriodDates, PeriodSheet, summarizePeriod, upcomingPeriods } from '../sheets/PeriodSheet';
 import { BUILD_NUMBER, isNative } from '../native/platform';
-import { latestApk, RELEASES_PAGE, type ApkRelease } from '../native/update';
+import { latestApk, RELEASES_PAGE, updateWebApp, type ApkRelease } from '../native/update';
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -26,9 +27,14 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-/** Version ; dans l'appli Android, lien vers la nouvelle APK s'il y en a une, sinon lien vers l'APK. */
+/**
+ * Version et bouton « Mettre à jour l'application » : l'appli web recharge la nouvelle version
+ * publiée ; l'appli Android ouvre le téléchargement de la nouvelle APK s'il y en a une.
+ */
 function AppVersion() {
+  const { showToast } = useNav();
   const [update, setUpdate] = useState<ApkRelease | null>(null);
+  const [checking, setChecking] = useState(false);
   useEffect(() => {
     if (!isNative || !BUILD_NUMBER) return;
     let cancelled = false;
@@ -37,9 +43,44 @@ function AppVersion() {
       cancelled = true;
     };
   }, []);
+
+  const checkUpdate = async () => {
+    setChecking(true);
+    try {
+      if (isNative) {
+        const latest = await latestApk();
+        if (!latest) showToast({ message: 'Vérification impossible (pas de réseau ?)' });
+        else if (latest.build > BUILD_NUMBER) {
+          setUpdate(latest);
+          window.open(latest.url, '_blank');
+          showToast({ message: `Nouvelle version n°${latest.build} : installe l’APK téléchargée` });
+        } else showToast({ message: "L'application est à jour" });
+        return;
+      }
+      const result = await updateWebApp();
+      if (result === 'updated') {
+        showToast({ message: 'Nouvelle version installée, redémarrage…' });
+        window.location.reload();
+      } else if (result === 'current') showToast({ message: "L'application est à jour" });
+      else if (result === 'offline') showToast({ message: 'Vérification impossible (pas de réseau ?)' });
+      else window.location.reload();
+    } finally {
+      setChecking(false);
+    }
+  };
+
   const linkStyle = { color: 'var(--accent-text)', fontWeight: 700 } as const;
   return (
     <div style={{ margin: '32px 0 0', textAlign: 'center', fontSize: 13, color: 'var(--faint)', lineHeight: 1.6 }}>
+      <button
+        type="button"
+        className="btn btn--secondary btn--block"
+        disabled={checking}
+        onClick={() => void checkUpdate()}
+        style={{ marginBottom: 12, ...(checking ? { opacity: 0.6 } : {}) }}
+      >
+        {checking ? 'Recherche d’une mise à jour…' : "Mettre à jour l'application"}
+      </button>
       <p style={{ margin: 0 }}>Planning — v0.3{isNative && BUILD_NUMBER ? ` · appli Android n°${BUILD_NUMBER}` : ''}</p>
       {update && (
         <p style={{ margin: 0 }}>
@@ -100,11 +141,11 @@ function ModeSwitch({ mode, checked, disabled, onChange }: { mode: Mode; checked
 }
 
 export function SettingsMode() {
-  const { windows, settings, updateSettings, exportData, importData, loadSample } = useStore();
+  const { windows, settings, updateSettings, updateCycleSettings, cycleDays, exportData, importData, loadSample } = useStore();
   const { visibleModes, setVisibleModes, openSheet, showToast } = useNav();
   const { status: sync } = useSync();
   const fileRef = useRef<HTMLInputElement>(null);
-  const ids = { def: useId(), buffer: useId(), horizon: useId() };
+  const ids = { def: useId(), buffer: useId(), horizon: useId(), load: useId() };
   /** Période spéciale ouverte : `{}` = nouvelle, `{ id }` = édition. */
   const [period, setPeriod] = useState<{ id?: string } | null>(null);
 
@@ -254,6 +295,26 @@ export function SettingsMode() {
             ))}
           </select>
         </Field>
+        {cycleDays.length > 0 && (
+          // Libellé sur plusieurs lignes : `Field` garde le sien sur une seule.
+          <div className="field">
+            <label htmlFor={ids.load} className="field__label" style={{ flex: 1, minWidth: 0, padding: '10px 0' }}>
+              Adapter la charge au cycle
+              <span style={{ display: 'block', fontSize: 13, fontWeight: 400, marginTop: 2, lineHeight: 1.4 }}>
+                Journées de plus en plus légères en phase lutéale jusqu'aux règles, pleines en phases folliculaire et
+                ovulatoire. Les échéances passent avant.
+              </span>
+            </label>
+            <input
+              id={ids.load}
+              type="checkbox"
+              role="switch"
+              className="switch"
+              checked={cycleSettingsOf(settings).adaptLoad}
+              onChange={(e) => updateCycleSettings({ adaptLoad: e.target.checked })}
+            />
+          </div>
+        )}
       </Section>
 
       <Section title="Données">

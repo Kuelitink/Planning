@@ -28,12 +28,13 @@ import { DEFAULT_SETTINGS } from '../core/types';
 import { createEntity, createTask, touch, type NewTask } from '../core/entity';
 import { parseDeadline, schedule, type ScheduleResult } from '../core/scheduler';
 import { activeEntry, entryDuration, startTimer as startEntry, stopTimer as stopEntry } from '../core/timer';
-import { MINUTE, parseDateTime, roundUpToGrid } from '../core/time';
+import { addDays, MINUTE, parseDateTime, roundUpToGrid, toISODate } from '../core/time';
 import type { CollectionName, ExportData, Repository } from '../storage/repository';
 import { IndexedDBRepository } from '../storage/indexeddb';
 import { hasLog } from '../core/cycle';
 import { mergeDay, type ClueImport, type DayData } from '../core/clue';
 import { CATEGORIES, cycleSettingsOf } from '../core/cycleCatalog';
+import { cycleLoad } from '../core/cycleLoad';
 import { initialSeed, sampleData, type Sample } from './defaults';
 import { checklistPicks, goalsOf, PERIOD_PRIORITY } from './urgency';
 import type { ChecklistChanges } from '../core/checklist';
@@ -253,8 +254,20 @@ export function schedulingRanks(data: AppData, now: Date): Map<ID, number> {
 }
 
 /**
+ * Charge de chaque jour de l'horizon selon le cycle (voir `core/cycleLoad.ts`) ; absent
+ * quand le réglage est coupé ou sans données de cycle.
+ */
+export function planDayLoad(data: AppData, now: Date): Record<ISODate, number> | undefined {
+  const cycle = cycleSettingsOf(data.settings);
+  if (!cycle.adaptLoad || !data.cycleDays?.length) return undefined;
+  const to = addDays(now, Math.max(1, data.settings.horizonDays));
+  return cycleLoad(data.cycleDays, data.cycleMarks ?? [], cycle, toISODate(now), toISODate(to));
+}
+
+/**
  * Plan du moteur pour `now`. « En retard » ne garde que les tâches qui dépassent leur
  * échéance réelle : une tâche de checklist qui ne tient pas dans sa période n'est pas un retard.
+ * Les journées sont allégées selon le cycle quand le réglage `adaptLoad` est actif.
  */
 export function computePlan(data: AppData, now: Date): ScheduleResult {
   const result = schedule({
@@ -265,6 +278,7 @@ export function computePlan(data: AppData, now: Date): ScheduleResult {
     settings: data.settings,
     now,
     ranks: schedulingRanks(data, now),
+    dayLoad: planDayLoad(data, now),
   });
   const byId = new Map(data.tasks.map((t) => [t.id, t]));
   const atRisk = result.atRisk.filter((r) => {
@@ -380,7 +394,7 @@ export function StoreProvider({ children, repository }: { children: ReactNode; r
     return { plan: computePlan(data, now), planAt: now };
     // `planTick` force un nouveau calcul avec l'heure actuelle.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, data.tasks, data.events, data.windows, data.projects, data.settings, data.timeEntries, data.goals, planTick]);
+  }, [ready, data.tasks, data.events, data.windows, data.projects, data.settings, data.timeEntries, data.goals, data.cycleDays, data.cycleMarks, planTick]);
 
   const replan = useCallback(() => setPlanTick((n) => n + 1), []);
 

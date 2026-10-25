@@ -1,6 +1,6 @@
 /** Fiche tâche : création ou édition. Tous les détails d'une tâche vivent ici. */
 
-import { useEffect, useId, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import type { ID, Priority, Task } from '../core/types';
 import { formatDuration, formatHM, isDateOnly, parseDateTime } from '../core/time';
 import { useStore } from '../state/store';
@@ -11,6 +11,111 @@ import { IconX } from '../ui/icons';
 import { REASON_LABEL } from '../modes/TaskRow';
 
 const CHUNKS = [15, 30, 45, 60];
+
+/** Valeurs d'une nouvelle tâche (mêmes que `createTask`). */
+const NEW_DURATION_MIN = 60;
+const NEW_SPLITTABLE = true;
+const NEW_MIN_CHUNK_MIN = 15;
+
+/** Bouton « Aucune » à l'allure des listes déroulantes des champs. */
+const NONE_BUTTON: CSSProperties = {
+  height: 40,
+  padding: '0 12px',
+  border: 'var(--stroke)',
+  borderRadius: 12,
+  background: 'var(--card)',
+  fontSize: 15,
+};
+
+/** Champ date caché sous le bouton « Aucune » : on n'en garde que le sélecteur natif. */
+const HIDDEN_DATE: CSSProperties = {
+  position: 'absolute',
+  inset: 0,
+  width: '100%',
+  height: '100%',
+  padding: 0,
+  border: 'none',
+  opacity: 0,
+  pointerEvents: 'none',
+};
+
+/**
+ * Date facultative : « Aucune » tant que rien n'est choisi (un champ date vide a l'air
+ * obligatoire, surtout sur Android). Toucher « Aucune » ouvre directement le sélecteur de date
+ * natif (annuler n'y change rien) ; sans `showPicker`, le champ apparaît, avec la croix pour
+ * revenir à « Aucune ». `children` (l'heure, par exemple) ne s'affiche qu'une date choisie.
+ */
+function OptionalDate({
+  id,
+  label,
+  value,
+  onChange,
+  clearLabel,
+  children,
+}: {
+  id: string;
+  /** Nom du champ, lu avec « aucune ». */
+  label: string;
+  value: string;
+  onChange: (date: string) => void;
+  clearLabel: string;
+  children?: ReactNode;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [revealed, setRevealed] = useState(false);
+  const shown = Boolean(value) || revealed;
+
+  useEffect(() => {
+    if (revealed && !value) inputRef.current?.focus();
+  }, [revealed, value]);
+
+  const pick = () => {
+    const input = inputRef.current;
+    try {
+      if (input && typeof input.showPicker === 'function') {
+        input.showPicker();
+        return;
+      }
+    } catch {
+      // Sélecteur indisponible : on montre le champ.
+    }
+    setRevealed(true);
+  };
+
+  return (
+    <span style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap' }}>
+      {!shown && (
+        <button type="button" id={id} style={NONE_BUTTON} aria-label={`${label} : aucune`} onClick={pick}>
+          Aucune
+        </button>
+      )}
+      <input
+        ref={inputRef}
+        id={shown ? id : undefined}
+        type="date"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        style={shown ? undefined : HIDDEN_DATE}
+        tabIndex={shown ? undefined : -1}
+        aria-hidden={shown ? undefined : true}
+      />
+      {value && children}
+      {shown && (
+        <button
+          type="button"
+          className="icon-btn"
+          aria-label={clearLabel}
+          onClick={() => {
+            onChange('');
+            setRevealed(false);
+          }}
+        >
+          <IconX size={18} />
+        </button>
+      )}
+    </span>
+  );
+}
 
 /** Échéance stockée → champs date / heure du formulaire. */
 function splitDeadline(value?: string): { date: string; time: string } {
@@ -39,15 +144,15 @@ export function TaskSheet({ id, defaults, onClose }: { id?: ID; defaults?: Parti
 
   const [title, setTitle] = useState(base.title ?? '');
   const [projectId, setProjectId] = useState(initialProject ?? '');
-  const [durationMin, setDurationMin] = useState(base.durationMin ?? 30);
+  const [durationMin, setDurationMin] = useState(base.durationMin ?? NEW_DURATION_MIN);
   const [priority, setPriority] = useState<Priority>(base.priority ?? 3);
   const [deadlineDate, setDeadlineDate] = useState(initialDeadline.date);
   const [deadlineTime, setDeadlineTime] = useState(initialDeadline.time);
   const [windowId, setWindowId] = useState(base.windowId ?? '');
   const [earliest, setEarliest] = useState(base.earliestStart ? toInputDate(parseDateTime(base.earliestStart)) : '');
   const [dependsOn, setDependsOn] = useState<ID[]>(base.dependsOn ?? []);
-  const [splittable, setSplittable] = useState(base.splittable ?? false);
-  const [minChunkMin, setMinChunkMin] = useState(base.minChunkMin ?? 30);
+  const [splittable, setSplittable] = useState(base.splittable ?? NEW_SPLITTABLE);
+  const [minChunkMin, setMinChunkMin] = useState(base.minChunkMin ?? NEW_MIN_CHUNK_MIN);
   const [notes, setNotes] = useState(base.notes ?? '');
 
   const ids = {
@@ -174,29 +279,26 @@ export function TaskSheet({ id, defaults, onClose }: { id?: ID; defaults?: Parti
             <PriorityPicker value={priority} onChange={setPriority} />
           </Field>
 
+          {/* Sans échéance (par défaut), le planificateur en déduit une de la priorité et
+              replace la tâche à chaque recalcul tant qu'elle n'est pas cochée. */}
           <Field label="Échéance" htmlFor={ids.deadline}>
-            <input id={ids.deadline} type="date" value={deadlineDate} onChange={(e) => setDeadlineDate(e.target.value)} />
-            {deadlineDate && (
-              <>
-                <input
-                  type="time"
-                  aria-label="Heure de l'échéance (facultatif)"
-                  value={deadlineTime}
-                  onChange={(e) => setDeadlineTime(e.target.value)}
-                />
-                <button
-                  type="button"
-                  className="icon-btn"
-                  aria-label="Effacer l'échéance"
-                  onClick={() => {
-                    setDeadlineDate('');
-                    setDeadlineTime('');
-                  }}
-                >
-                  <IconX size={18} />
-                </button>
-              </>
-            )}
+            <OptionalDate
+              id={ids.deadline}
+              label="Échéance"
+              value={deadlineDate}
+              onChange={(d) => {
+                setDeadlineDate(d);
+                if (!d) setDeadlineTime('');
+              }}
+              clearLabel="Effacer l'échéance"
+            >
+              <input
+                type="time"
+                aria-label="Heure de l'échéance (facultatif)"
+                value={deadlineTime}
+                onChange={(e) => setDeadlineTime(e.target.value)}
+              />
+            </OptionalDate>
           </Field>
 
           <Field label="Horaires" htmlFor={ids.window}>
@@ -211,12 +313,7 @@ export function TaskSheet({ id, defaults, onClose }: { id?: ID; defaults?: Parti
           </Field>
 
           <Field label="Pas avant" htmlFor={ids.earliest}>
-            <input id={ids.earliest} type="date" value={earliest} onChange={(e) => setEarliest(e.target.value)} />
-            {earliest && (
-              <button type="button" className="icon-btn" aria-label="Effacer la date de début" onClick={() => setEarliest('')}>
-                <IconX size={18} />
-              </button>
-            )}
+            <OptionalDate id={ids.earliest} label="Pas avant" value={earliest} onChange={setEarliest} clearLabel="Effacer la date de début" />
           </Field>
 
           <Field label="Après" htmlFor={ids.deps}>
