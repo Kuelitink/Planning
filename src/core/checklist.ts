@@ -141,3 +141,39 @@ export function checklistChanges(rows: ChecklistRow[], tasks: Task[]): Checklist
   }
   return { order, tasks: changed };
 }
+
+/**
+ * Tâches de premier niveau d'une liste (projet), dans leur ordre : rang `order` (fixé en
+ * déplaçant les lignes), puis priorité, puis date de création. Une tâche dont la mère est
+ * dans la même liste n'y figure pas : elle s'affiche sous sa mère.
+ */
+export function listTopIds(listTasks: Task[]): ID[] {
+  const inList = new Set(listTasks.map((t) => t.id));
+  return listTasks
+    .filter((t) => !t.parentId || !inList.has(t.parentId))
+    .sort(
+      (a, b) =>
+        (a.order ?? Infinity) - (b.order ?? Infinity) ||
+        a.priority - b.priority ||
+        a.createdAt.localeCompare(b.createdAt) ||
+        a.id.localeCompare(b.id),
+    )
+    .map((t) => t.id);
+}
+
+/**
+ * Modifications d'une liste après un déplacement : chaque tâche de premier niveau prend
+ * son rang dans la liste, les sous-tâches leur mère et leur rang sous elle.
+ */
+export function listChanges(rows: ChecklistRow[], tasks: Task[]): ChecklistChanges['tasks'] {
+  const byId = new Map(tasks.map((t) => [t.id, t]));
+  const { order, tasks: links } = checklistChanges(rows, tasks);
+  const out = new Map(links.map((c) => [c.id, c]));
+  order.forEach((id, i) => {
+    const task = byId.get(id)!;
+    const link = out.get(id);
+    const parentId = link ? link.parentId : task.parentId;
+    if (link || task.order !== i) out.set(id, { id, parentId, order: i });
+  });
+  return [...out.values()];
+}

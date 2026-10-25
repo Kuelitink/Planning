@@ -4,6 +4,8 @@ import {
   checklistChanges,
   checklistRows,
   indentRow,
+  listChanges,
+  listTopIds,
   moveRow,
   outdentRow,
   type ChecklistRow,
@@ -93,5 +95,30 @@ describe('déplacer et décaler', () => {
     const tasks = [task('C', { parentId: 'X' }), task('B')];
     // L'orpheline garde sa mère.
     expect(checklistChanges(withOrphan, tasks)).toEqual({ order: ['C', 'B'], tasks: [] });
+  });
+});
+
+describe('ordre dans une liste', () => {
+  it('rang fixé, puis priorité, puis création ; les sous-tâches restent sous leur mère', () => {
+    const tasks = [
+      task('Sans rang P1', { priority: 1 }),
+      task('Rang 1', { order: 1 }),
+      task('Rang 0', { order: 0 }),
+      task('Sans rang P3', { priority: 3 }),
+      task('Sous', { parentId: 'Rang 0' }),
+    ];
+    expect(listTopIds(tasks)).toEqual(['Rang 0', 'Rang 1', 'Sans rang P1', 'Sans rang P3']);
+    expect(view(checklistRows(listTopIds(tasks), tasks))).toEqual(['Rang 0', '  Sous', 'Rang 1', 'Sans rang P1', 'Sans rang P3']);
+  });
+
+  it('après un déplacement, chaque tâche prend son rang (seules celles qui changent)', () => {
+    const tasks = [task('A', { order: 0 }), task('B', { order: 1 }), task('C')];
+    const rows = checklistRows(listTopIds(tasks), tasks);
+    const moved = indentRow(moveRow(rows, 2, 0), 1);
+    expect(view(moved)).toEqual(['C', '  A', 'B']);
+    expect(listChanges(moved, tasks)).toEqual([
+      { id: 'A', parentId: 'C', order: 0 },
+      { id: 'C', parentId: undefined, order: 0 },
+    ]);
   });
 });

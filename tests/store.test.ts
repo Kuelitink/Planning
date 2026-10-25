@@ -191,3 +191,13 @@ describe('checklist et hiérarchie', () => {
     expect(new Date(sub.deadline!).getTime()).toBe(at('2026-10-20 00:00').getTime());
   });
 });
+
+describe('ordre des listes', () => {
+  it("à priorité égale, en haut de la liste = planifiée d'abord", () => {
+    const d = data({
+      tasks: [task('Deuxième', { order: 1 }), task('Troisième', { order: 2 }), task('Première', { order: 0 })],
+    });
+    const plan = computePlan(d, at('2026-10-19 08:00'));
+    expect(plan.blocks.map((b) => b.taskId)).toEqual(['Première', 'Deuxième', 'Troisième']);
+  });
+});

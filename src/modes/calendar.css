@@ -259,6 +259,83 @@
   padding-bottom: 0;
 }
 
+/* Tâche : case à cocher, puis le reste du bloc (ouvre la fiche). */
+.tl__block:not(.tl__block--event) {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 3px;
+}
+
+.tl__block--line:not(.tl__block--event) {
+  align-items: center;
+}
+
+.tl--wide .tl__block:not(.tl__block--event) {
+  gap: 6px;
+}
+
+.tl__open {
+  flex: 1;
+  min-width: 0;
+  align-self: stretch;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.tl__block--line .tl__open {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+/* Zone de toucher plus grande que la case. */
+.tl__checkhit {
+  flex: none;
+  display: grid;
+  place-items: center;
+  margin: -4px;
+  padding: 4px;
+  cursor: pointer;
+}
+
+.tl__check {
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
+  width: 12px;
+  height: 12px;
+  border: 1.5px solid var(--ring, var(--ink));
+  border-radius: 3px;
+  background: var(--card);
+  cursor: pointer;
+}
+
+.tl--wide .tl__check {
+  width: 16px;
+  height: 16px;
+  border-width: 2px;
+  border-radius: 4px;
+}
+
+/* Bloc d'une ligne (30 min) : case plus petite pour tenir dedans. */
+.tl--wide .tl__block--line .tl__check {
+  width: 12px;
+  height: 12px;
+  border-width: 1.5px;
+  border-radius: 3px;
+}
+
+.tl__check:active {
+  background: var(--ring, var(--ink));
+}
+
 .tl--wide .tl__block--line {
   padding-top: 0;
   padding-bottom: 0;

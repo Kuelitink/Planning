@@ -1,14 +1,20 @@
-/** Mode Listes : les listes / projets, puis les tâches d'une liste. */
+/**
+ * Mode Listes : les listes / projets, puis les tâches d'une liste, dans leur ordre (en haut =
+ * la plus urgente, à priorité égale) : appui long + glisser pour réordonner, glisser à droite
+ * pour une sous-tâche, comme dans la Checklist.
+ */
 
 import { useEffect, useId, useMemo, useState, type FormEvent } from 'react';
 import type { ID } from '../core/types';
 import { formatDuration } from '../core/time';
 import { useStore } from '../state/store';
 import { useNav } from '../state/nav';
-import { Dot, Fab, Header, useNow } from '../ui/kit';
+import { Dot, Fab, Header } from '../ui/kit';
 import { NEUTRAL_TONE } from '../ui/palette';
 import { IconChevronLeft, IconChevronRight, IconPlus } from '../ui/icons';
-import { Collapsible, LIST_STYLE, TaskRow, plannedLabel, usePlanIndex } from './TaskRow';
+import { checklistRows, listChanges, listTopIds, type ChecklistRow } from '../core/checklist';
+import { Collapsible, LIST_STYLE, TaskRow } from './TaskRow';
+import { INDENT_PX, SortableTaskList } from './SortableTasks';
 
 /** Identifiant de la pseudo-liste des tâches sans liste. */
 export const NO_LIST = '__none__';
@@ -73,10 +79,8 @@ function ListOverview() {
 }
 
 function ListDetail({ id }: { id: ID }) {
-  const { projects, tasks, addTask } = useStore();
+  const { projects, tasks, addTask, reorderTasks } = useStore();
   const { openSheet, setOpenListId } = useNav();
-  const now = useNow(60_000);
-  const index = usePlanIndex();
   const inputId = useId();
   const [draft, setDraft] = useState('');
 
@@ -90,36 +94,49 @@ function ListDetail({ id }: { id: ID }) {
   }, [missing, setOpenListId]);
 
   const known = useMemo(() => new Set(projects.map((p) => p.id)), [projects]);
+  const byId = useMemo(() => new Map(tasks.map((t) => [t.id, t])), [tasks]);
   const inList = useMemo(
     () => tasks.filter((t) => (isNone ? !t.projectId || !known.has(t.projectId) : t.projectId === id)),
     [tasks, isNone, known, id],
   );
 
-  const todo = useMemo(() => {
-    const order = (taskId: ID) => index.first.get(taskId)?.start.getTime() ?? Number.MAX_SAFE_INTEGER;
-    return inList
-      .filter((t) => t.status === 'todo')
-      .sort((a, b) => order(a.id) - order(b.id) || a.priority - b.priority || a.createdAt.localeCompare(b.createdAt));
-  }, [inList, index]);
-
-  const done = useMemo(
-    () => inList.filter((t) => t.status === 'done').sort((a, b) => (b.doneAt ?? '').localeCompare(a.doneAt ?? '')),
-    [inList],
-  );
+  // Dans l'ordre de la liste (en haut = la plus urgente), chaque tâche suivie de ses sous-tâches ;
+  // les tâches faites (avec leurs sous-tâches) dans « Fait ».
+  const { todoRows, doneRows } = useMemo(() => {
+    const todo: ChecklistRow[] = [];
+    const done: ChecklistRow[] = [];
+    let target = todo;
+    for (const r of checklistRows(listTopIds(inList), tasks)) {
+      if (r.depth === 0) target = byId.get(r.id)?.status === 'done' ? done : todo;
+      target.push(r);
+    }
+    return { todoRows: todo, doneRows: done };
+  }, [inList, tasks, byId]);
 
   if (missing) return null;
 
+  const todoTasks = inList.filter((t) => t.status === 'todo');
   const name = project?.name ?? 'Sans liste';
   const color = project?.color ?? NEUTRAL_TONE.dot;
-  const remainingMin = todo.reduce((sum, t) => sum + t.durationMin, 0);
-  const subtitle = todo.length ? `${todo.length} à faire · ${formatDuration(remainingMin)}` : 'Rien à faire';
+  const remainingMin = todoTasks.reduce((sum, t) => sum + t.durationMin, 0);
+  const subtitle = todoTasks.length ? `${todoTasks.length} à faire · ${formatDuration(remainingMin)}` : 'Rien à faire';
   const projectId = project?.id;
+  const doneCount = doneRows.filter((r) => r.depth === 0).length;
+
+  const saveRows = (next: ChecklistRow[]) => reorderTasks(listChanges([...next, ...doneRows], tasks));
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
     const title = draft.trim();
     if (!title) return;
-    addTask({ title, projectId });
+    // Nouvelle tâche en bas de la liste : l'ordre affiché devient l'ordre enregistré.
+    const top = listTopIds(inList);
+    reorderTasks(
+      top
+        .map((tid, i) => ({ id: tid, parentId: byId.get(tid)?.parentId, order: i }))
+        .filter((l) => byId.get(l.id)?.order !== l.order),
+    );
+    addTask({ title, projectId, order: top.length });
     setDraft('');
   };
 
@@ -143,31 +160,31 @@ function ListDetail({ id }: { id: ID }) {
       </div>
       <p className="subtitle">{subtitle}</p>
 
-      <ul className="stack" style={{ ...LIST_STYLE, marginTop: 20 }}>
-        {todo.map((task) => (
-          <TaskRow key={task.id} task={task} meta={plannedLabel(index, task.id, now)} late={index.late.has(task.id)} />
-        ))}
-      </ul>
+      <div style={{ marginTop: 20 }}>
+        {todoRows.length > 0 && <SortableTaskList rows={todoRows} tasks={byId} onRows={saveRows} />}
+      </div>
 
-      <form onSubmit={submit} style={{ marginTop: todo.length ? 8 : 0 }}>
+      <form onSubmit={submit} className="cl-add">
         <label htmlFor={inputId} className="sr-only">
           Ajouter une tâche à {name}
         </label>
         <input
           id={inputId}
           className="text-input"
-          placeholder="Ajouter une tâche…"
+          placeholder="+ Ajouter une tâche…"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           enterKeyHint="done"
           autoComplete="off"
         />
       </form>
+      {todoRows.length > 1 && <p className="cl-tip">Appui long pour déplacer · glisser à droite pour une sous-tâche</p>}
 
-      <Collapsible label="Fait" count={done.length}>
-        {done.map((task) => (
-          <TaskRow key={task.id} task={task} />
-        ))}
+      <Collapsible label="Fait" count={doneCount}>
+        {doneRows.map((r) => {
+          const task = byId.get(r.id);
+          return task ? <TaskRow key={r.id} task={task} indent={r.depth ? INDENT_PX : 0} /> : null;
+        })}
       </Collapsible>
 
       <Fab onClick={() => openSheet({ kind: 'task', defaults: { projectId } })} label="Ajouter une tâche" />

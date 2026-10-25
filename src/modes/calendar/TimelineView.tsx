@@ -12,7 +12,7 @@ import { useNav } from '../../state/nav';
 import { useNow } from '../../ui/kit';
 import { IconFlag, IconTimer } from '../../ui/icons';
 import { formatDayLong } from '../../ui/format';
-import { toneOf } from '../../ui/palette';
+import { PRIORITY_COLOR, toneOf } from '../../ui/palette';
 import { OvulationDot, dayPhase, describeMark, phaseClass, useCalendarMarks } from '../cycle/shared';
 import '../cycle.css';
 import { WEEKDAY_INITIAL, columnStyle, hourLabel, isAllDay, isTimed, itemKey, layout, minutesOf, quarterAt } from './shared';
@@ -78,8 +78,14 @@ export function TimelineView({
   onAnchor: (day: Date) => void;
   onPickDay: (day: Date) => void;
 }) {
-  const { plan, tasks, events, windows, settings, projects, active } = useStore();
-  const { openSheet } = useNav();
+  const { plan, tasks, events, windows, settings, projects, active, setTaskDone } = useStore();
+  const { openSheet, showToast } = useNav();
+
+  /** Cocher une tâche dans la grille : terminée (elle quitte le planning), avec « Annuler ». */
+  const done = (taskId: string) => {
+    setTaskDone(taskId, true);
+    showToast({ message: 'Tâche terminée', action: { label: 'Annuler', run: () => setTaskDone(taskId, false) } });
+  };
   const now = useNow(60_000);
 
   const scroller = useRef<HTMLDivElement>(null);
@@ -361,34 +367,48 @@ export function TimelineView({
                   const part = item.part ? ` · ${item.part.index}/${item.part.count}` : '';
                   if (running) cls.push('tl__block--running');
                   return (
-                    <button
+                    <div
                       key={itemKey(item)}
-                      type="button"
                       className={cls.filter(Boolean).join(' ')}
                       style={{ top, height: h, '--tone-fill': colorOf(item.projectId).fill, ...columnStyle(p, 2) } as CSSProperties}
-                      aria-label={`${item.title}, ${when}${running ? ', chrono en cours' : ''}`}
-                      onClick={() => openSheet({ kind: 'task', id: item.taskId })}
                     >
-                      <span className="tl__title" style={{ WebkitLineClamp: wide && !oneLine ? 1 : lines }}>
-                        {running && (
-                          <span className="tl__running" aria-hidden="true">
-                            <IconTimer size={12} />
-                          </span>
-                        )}
-                        {item.title}
-                        {atRisk.has(item.taskId) && (
-                          <span className="tl__risk" aria-hidden="true">
-                            <IconFlag size={11} />
-                          </span>
-                        )}
-                      </span>
-                      {wide && (
-                        <span className="tl__time">
-                          {oneLine ? formatHM(item.start) : `${formatHM(item.start)} – ${formatHM(item.end)}`}
-                          {part}
+                      <label className="tl__checkhit">
+                        <input
+                          type="checkbox"
+                          className="tl__check"
+                          style={{ '--ring': PRIORITY_COLOR[item.priority] } as CSSProperties}
+                          checked={false}
+                          onChange={() => done(item.taskId)}
+                          aria-label={`Terminer « ${item.title} »`}
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        className="tl__open"
+                        aria-label={`${item.title}, ${when}${running ? ', chrono en cours' : ''}`}
+                        onClick={() => openSheet({ kind: 'task', id: item.taskId })}
+                      >
+                        <span className="tl__title" style={{ WebkitLineClamp: wide && !oneLine ? 1 : lines }}>
+                          {running && (
+                            <span className="tl__running" aria-hidden="true">
+                              <IconTimer size={12} />
+                            </span>
+                          )}
+                          {item.title}
+                          {atRisk.has(item.taskId) && (
+                            <span className="tl__risk" aria-hidden="true">
+                              <IconFlag size={11} />
+                            </span>
+                          )}
                         </span>
-                      )}
-                    </button>
+                        {wide && (
+                          <span className="tl__time">
+                            {oneLine ? formatHM(item.start) : `${formatHM(item.start)} – ${formatHM(item.end)}`}
+                            {part}
+                          </span>
+                        )}
+                      </button>
+                    </div>
                   );
                 })}
                 {isToday && (

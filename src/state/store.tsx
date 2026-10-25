@@ -37,7 +37,7 @@ import { CATEGORIES, cycleSettingsOf } from '../core/cycleCatalog';
 import { cycleLoad } from '../core/cycleLoad';
 import { initialSeed, sampleData, type Sample } from './defaults';
 import { checklistPicks, goalsOf, PERIOD_PRIORITY } from './urgency';
-import type { ChecklistChanges } from '../core/checklist';
+import { listTopIds, type ChecklistChanges } from '../core/checklist';
 
 export interface AppData {
   projects: Project[];
@@ -83,6 +83,8 @@ export interface Store extends AppData {
   unpickTask(taskId: ID, period: GoalPeriod, periodStart: ISODate): void;
   /** Applique un réordonnancement de la checklist (ordre de la période, sous-tâches). */
   applyChecklist(period: GoalPeriod, periodStart: ISODate, changes: ChecklistChanges): void;
+  /** Change la tâche mère et le rang de tâches (ordre d'une liste, sous-tâches). */
+  reorderTasks(links: ChecklistChanges['tasks']): void;
 
   /** Session de chrono en cours. */
   active?: TimeEntry;
@@ -229,7 +231,8 @@ export function tasksForScheduling(data: AppData, now: Date): Task[] {
 /**
  * Rang de chaque tâche, qui départage le planificateur à priorité égale : d'abord les
  * tâches des checklists, dans leur ordre (en haut = la plus urgente ; une sous-tâche
- * juste après sa mère), puis les autres, liste du dessus d'abord.
+ * juste après sa mère), puis les autres, liste du dessus d'abord et, dans une liste, dans
+ * l'ordre de la liste.
  */
 export function schedulingRanks(data: AppData, now: Date): Map<ID, number> {
   const byId = new Map(data.tasks.map((t) => [t.id, t]));
@@ -237,12 +240,22 @@ export function schedulingRanks(data: AppData, now: Date): Map<ID, number> {
   const listIndex = new Map(
     [...data.projects].sort((a, b) => a.order - b.order).map((p, i) => [p.id, i] as const),
   );
+  // Place de chaque tâche dans sa liste (en haut = la plus urgente).
+  const byList = new Map<ID, Task[]>();
+  for (const t of data.tasks) {
+    const key = t.projectId !== undefined && listIndex.has(t.projectId) ? t.projectId : '';
+    const list = byList.get(key);
+    if (list) list.push(t);
+    else byList.set(key, [t]);
+  }
+  const listPos = new Map<ID, number>();
+  for (const list of byList.values()) listTopIds(list).forEach((id, i) => listPos.set(id, i));
   const ranks = new Map<ID, number>();
   const base = (t: Task): number => {
     const pick = picks.get(t.id);
     if (pick) return pick.index * 1000;
     const list = t.projectId !== undefined ? listIndex.get(t.projectId) : undefined;
-    return 1e9 + (list ?? listIndex.size) * 1000;
+    return 1e9 + (list ?? listIndex.size) * 1e6 + Math.min(999, listPos.get(t.id) ?? 999) * 1000;
   };
   for (const t of data.tasks) {
     if (t.status !== 'todo') continue;
@@ -615,18 +628,28 @@ export function StoreProvider({ children, repository }: { children: ReactNode; r
     [applyGoals],
   );
 
+  const reorderTasks = useCallback(
+    (links: ChecklistChanges['tasks']) => {
+      if (!links.length) return;
+      const now = new Date();
+      const byId = new Map(links.map((c) => [c.id, c]));
+      const changed = new Map<ID, Task>();
+      for (const t of dataRef.current.tasks) {
+        const c = byId.get(t.id);
+        if (c) changed.set(t.id, touch(t, { parentId: c.parentId, order: c.order }, now));
+      }
+      const apply = (list: Task[]) => list.map((t) => changed.get(t.id) ?? t);
+      dataRef.current = { ...dataRef.current, tasks: apply(dataRef.current.tasks) };
+      setData((d) => ({ ...d, tasks: apply(d.tasks) }));
+      changed.forEach((t) => persist('tasks', t));
+    },
+    [persist],
+  );
+
   const applyChecklist = useCallback(
     (period: GoalPeriod, periodStart: ISODate, changes: ChecklistChanges) => {
       const now = new Date();
-      const byId = new Map(changes.tasks.map((c) => [c.id, c]));
-      const tasks = dataRef.current.tasks.map((t) => {
-        const c = byId.get(t.id);
-        return c ? touch(t, { parentId: c.parentId, order: c.order }, now) : t;
-      });
-      const changedTasks = tasks.filter((t) => byId.has(t.id));
-      dataRef.current = { ...dataRef.current, tasks };
-      setData((d) => ({ ...d, tasks: d.tasks.map((t) => changedTasks.find((x) => x.id === t.id) ?? t) }));
-      changedTasks.forEach((t) => persist('tasks', t));
+      reorderTasks(changes.tasks);
 
       // Toute la checklist de la période dans un seul objectif, dans le nouvel ordre.
       const own = goalsOf(dataRef.current.goals, period, periodStart);
@@ -636,7 +659,7 @@ export function StoreProvider({ children, repository }: { children: ReactNode; r
         : createEntity<Goal>({ title: 'Objectifs', period, periodStart, taskIds: changes.order, done: false }, now);
       applyGoals(changes.order.length || first ? [next] : [], others.map((g) => g.id));
     },
-    [persist, applyGoals],
+    [reorderTasks, applyGoals],
   );
 
   // --- Chrono --------------------------------------------------------------------
@@ -828,6 +851,7 @@ export function StoreProvider({ children, repository }: { children: ReactNode; r
     pickTask,
     unpickTask,
     applyChecklist,
+    reorderTasks,
     active,
     lastTimedTaskId,
     startTimer,

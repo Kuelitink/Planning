@@ -21,6 +21,10 @@ dépendances, horaires, découpage) sont dans sa fiche : on l'ouvre en touchant 
   normale (mois). Appui long puis glisser pour réordonner ; glisser à droite pour en faire une
   sous-tâche de la ligne du dessus (elle suit sa mère), à gauche pour la remettre au premier
   niveau ou la retirer. Une tâche ajoutée dans la checklist est planifiée.
+- **Listes** : même fonctionnement que la Checklist (appui long pour réordonner, glisser à
+  droite pour une sous-tâche) ; à priorité égale, une tâche plus haut dans sa liste est
+  planifiée avant.
+- **Planning** : une case sur chaque tâche de la grille pour la terminer sans ouvrir sa fiche.
 - **Sous-tâches** : planifiées chacune à la place de leur tâche mère, avec son échéance, sa
   priorité et sa place ; cocher la dernière coche la mère.
 - **Hiérarchie des listes** : à priorité égale, la liste du dessus passe avant celle du dessous
