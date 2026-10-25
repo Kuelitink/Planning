@@ -2,7 +2,7 @@
 
 Application de planning pour téléphone Android (APK), dans l'esprit de FlowSavvy :
 calendrier avec événements et to-do, **auto-planification** des tâches (priorités, échéances,
-dépendances, horaires autorisés), listes/projets, objectifs du jour/semaine/mois, chrono, et suivi
+dépendances, horaires autorisés), listes/projets, checklist du jour/semaine/mois, chrono, et suivi
 du cycle menstruel façon Clue (avec import des données Clue).
 
 Les données restent sur l'appareil (IndexedDB), avec export/import JSON (à envoyer sur Drive par
@@ -10,8 +10,21 @@ le menu de partage) et une sauvegarde automatique chiffrée dans un dépôt GitH
 Deux widgets d'écran d'accueil (voir plus bas).
 
 L'app fonctionne par **modes**, choisis dans le menu en haut à gauche : Calendrier,
-Checklist (to-do du jour auto-planifiée), Listes, Objectifs, Chrono, Cycle, et Réglages. Les détails
-d'une tâche (priorité, échéance, dépendances, horaires, découpage) sont dans sa fiche.
+Checklist, Listes, Chrono, Cycle, et Réglages. Les détails d'une tâche (priorité, échéance,
+dépendances, horaires, découpage) sont dans sa fiche : on l'ouvre en touchant son titre ou son
+échéance, à droite.
+
+- **Calendrier** : vues Jour, 3 jours, Semaine (grille de minuit à minuit, qui défile jour par jour ;
+  pincer pour étirer les heures) et Mois.
+- **Checklist** : les tâches importantes du jour, de la semaine ou du mois, dans l'ordre (en haut =
+  la plus urgente). Une tâche de la checklist est planifiée comme ASAP (jour), haute (semaine) ou
+  normale (mois). Appui long puis glisser pour réordonner ; glisser à droite pour en faire une
+  sous-tâche de la ligne du dessus (elle suit sa mère), à gauche pour la remettre au premier
+  niveau ou la retirer. Une tâche ajoutée dans la checklist est planifiée.
+- **Sous-tâches** : planifiées chacune à la place de leur tâche mère, avec son échéance, sa
+  priorité et sa place ; cocher la dernière coche la mère.
+- **Hiérarchie des listes** : à priorité égale, la liste du dessus passe avant celle du dessous
+  (une haute d'une liste du dessous passe quand même avant une normale du dessus).
 
 ## Commandes
 
@@ -34,7 +47,7 @@ cd android && ./gradlew testDebugUnitTest     # tests des widgets (images dans a
 - `src/core/` — logique pure, sans interface :
   - `types.ts` modèle de données (listes, horaires, tâches, événements, objectifs, chrono, réglages) ;
   - `scheduler.ts` auto-planification (règles et score d'urgence documentés en tête du fichier) ;
-  - `daily.ts` to-do du jour et totaux ; `goals.ts` objectifs ; `timer.ts` chrono ;
+  - `daily.ts` to-do du jour et totaux ; `goals.ts` périodes de la checklist ; `checklist.ts` ordre et sous-tâches de la checklist ; `timer.ts` chrono ;
   - `time.ts`, `intervals.ts`, `windows.ts`, `events.ts` utilitaires (heure locale, récurrences) ;
   - `cycle.ts` cycles, moyennes et prédictions (règles de calcul en tête du fichier) ;
     `cycleCatalog.ts` catégories de suivi ; `insights.ts` analyses détaillées ; `reminders.ts` rappels ;
@@ -46,7 +59,7 @@ cd android && ./gradlew testDebugUnitTest     # tests des widgets (images dans a
 - `android/` — projet Android (Capacitor) ; widgets dans `app/src/main/java/…/widget/`.
 - `src/state/` — état React : `store.tsx` (données, plan, chrono, cycle), `cycle.ts` (prédictions
   du jour, notifications), `nav.tsx` (modes, feuilles),
-  `defaults.ts` (premier lancement, exemple), `urgency.ts` (objectifs, tri par urgence, recherche).
+  `defaults.ts` (premier lancement, exemple), `urgency.ts` (checklist, tri par urgence, recherche).
 - `src/ui/` — thème (DA « Trait fin » : rose pâle, fin trait prune, Fredoka + Nunito), icônes, composants partagés, formats de dates.
 - `src/modes/` — un fichier par mode (vues du mode Cycle dans `modes/cycle/`) ;
   `src/sheets/` — feuilles du bas (tâche, événement, jour du cycle…).

@@ -132,3 +132,62 @@ describe("jeu d'exemple", () => {
     expect(twice).toEqual(once);
   });
 });
+
+describe('checklist et hiérarchie', () => {
+  const day = (ids: string[]) => goal('jour', 'day', '2026-10-19', ids);
+  const project = (id: string, order: number) =>
+    createEntity<AppData['projects'][number]>({ name: id, color: '#3D6FE0', archived: false, order }, new Date('2026-10-01T00:00:00'), id);
+
+  it('checklist : ASAP le jour, haute la semaine, normale le mois', () => {
+    const d = data({
+      tasks: [task('Jour', { priority: 4 }), task('Semaine', { priority: 4 }), task('Mois', { priority: 4 }), task('Haute', { priority: 2 })],
+      goals: [day(['Jour']), goal('semaine', 'week', '2026-10-19', ['Semaine', 'Haute']), goal('mois', 'month', '2026-10-01', ['Mois'])],
+    });
+    const prio = Object.fromEntries(tasksForScheduling(d, at('2026-10-19 08:00')).map((t) => [t.id, t.priority]));
+    expect(prio).toEqual({ Jour: 1, Semaine: 2, Mois: 3, Haute: 2 });
+  });
+
+  it('en haut de la checklist = planifiée en premier', () => {
+    const d = data({
+      tasks: [task('Premier'), task('Deuxième'), task('Troisième')],
+      goals: [day(['Troisième', 'Premier', 'Deuxième'])],
+    });
+    const plan = computePlan(d, at('2026-10-19 08:00'));
+    expect(plan.blocks.map((b) => b.taskId)).toEqual(['Troisième', 'Premier', 'Deuxième']);
+  });
+
+  it('à priorité égale, la liste du dessus passe avant ; une haute de la liste du dessous passe avant une normale du dessus', () => {
+    const d = data({
+      projects: [project('Haut', 0), project('Bas', 1)],
+      tasks: [
+        task('Bas normale', { projectId: 'Bas', priority: 3 }),
+        task('Haut normale', { projectId: 'Haut', priority: 3 }),
+        task('Bas ASAP', { projectId: 'Bas', priority: 1 }),
+        task('Haut ASAP', { projectId: 'Haut', priority: 1 }),
+        task('Bas haute', { projectId: 'Bas', priority: 2 }),
+      ],
+    });
+    const plan = computePlan(d, at('2026-10-19 08:00'));
+    expect(plan.blocks.map((b) => b.taskId)).toEqual(['Haut ASAP', 'Bas ASAP', 'Bas haute', 'Haut normale', 'Bas normale']);
+  });
+
+  it('une tâche mère ne se planifie pas : ses sous-tâches héritent de sa place et de son échéance', () => {
+    const d = data({
+      tasks: [
+        task('Autre', { priority: 1 }),
+        task('Mère', { priority: 4, durationMin: 60 }),
+        task('Sous 2', { parentId: 'Mère', order: 1 }),
+        task('Sous 1', { parentId: 'Mère', order: 0 }),
+        task('Après', { dependsOn: ['Mère'], priority: 1 }),
+      ],
+      goals: [day(['Mère', 'Autre'])],
+    });
+    const now = at('2026-10-19 08:00');
+    const plan = computePlan(d, now);
+    expect(blocksOf(plan, 'Mère')).toEqual([]);
+    expect(plan.blocks.map((b) => b.taskId)).toEqual(['Sous 1', 'Sous 2', 'Autre', 'Après']);
+    const sub = tasksForScheduling(d, now).find((t) => t.id === 'Sous 1')!;
+    expect(sub.priority).toBe(1);
+    expect(new Date(sub.deadline!).getTime()).toBe(at('2026-10-20 00:00').getTime());
+  });
+});

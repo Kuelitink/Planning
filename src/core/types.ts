@@ -94,6 +94,13 @@ export interface Task extends Entity {
   notes?: string;
   /** Créneau fixé à la main : le planificateur ne le déplace pas. */
   pinned?: TimeRange;
+  /**
+   * Sous-tâche de cette tâche (un seul niveau). Une tâche qui a des sous-tâches à faire
+   * n'est pas planifiée elle-même : ses sous-tâches le sont, avec son échéance et sa priorité.
+   */
+  parentId?: ID;
+  /** Rang parmi les sous-tâches de la même tâche (plus petit = plus haut). */
+  order?: number;
 }
 
 export interface Recurrence {
@@ -121,7 +128,7 @@ export interface Goal extends Entity {
   period: GoalPeriod;
   /** Début de la période : le jour, le lundi de la semaine ou le 1er du mois. */
   periodStart: ISODate;
-  /** Tâches liées, pour y accéder (et chronométrer) plus vite. */
+  /** Tâches de la checklist de la période, dans l'ordre (en haut = la plus urgente). */
   taskIds: ID[];
   /** Objectif chiffré (ex. « courir 3 fois »). */
   target?: number;

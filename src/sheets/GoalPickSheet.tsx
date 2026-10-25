@@ -1,5 +1,5 @@
 /**
- * Choisir les tâches des objectifs d'une période : les plus urgentes d'abord, ou par
+ * Choisir les tâches de la checklist d'une période : les plus urgentes d'abord, ou par
  * recherche (titre ou liste, sans tenir compte des accents). Toucher une tâche
  * l'ajoute ou la retire tout de suite ; un titre introuvable peut être créé.
  */
@@ -7,25 +7,17 @@
 import { useId, useMemo, useState } from 'react';
 import type { GoalPeriod, ISODate, Task } from '../core/types';
 import { parseDeadline } from '../core/scheduler';
-import { DAY, formatHM, isDateOnly, isSameDay, parseDateTime } from '../core/time';
+import { DAY } from '../core/time';
 import { useStore } from '../state/store';
 import { byUrgency, fold, isLate, matchesQuery, pickedTaskIds } from '../state/urgency';
 import { Dot, Sheet } from '../ui/kit';
 import { IconCheck, IconFlag, IconPlus } from '../ui/icons';
-import { formatRelativeDay } from '../ui/format';
 import { PRIORITY_COLOR } from '../ui/palette';
-import { plannedLabel, usePlanIndex, type PlanIndex } from '../modes/TaskRow';
-import { periodLabel } from '../modes/GoalsMode';
+import { plannedLabel, shortDeadline, usePlanIndex, type PlanIndex } from '../modes/TaskRow';
+import { periodLabel } from '../modes/ChecklistMode';
 
 /** Une échéance à moins de 3 jours s'affiche à la place du créneau prévu. */
 const SOON_MS = 3 * DAY;
-
-/** « Auj. », « Demain », « Mer. 21 oct. », avec l'heure si l'échéance en a une. */
-function shortDeadline(s: string, now: Date): string {
-  const d = parseDateTime(s);
-  const day = isSameDay(d, now) ? 'Auj.' : formatRelativeDay(d, now);
-  return isDateOnly(s) ? day : `${day} ${formatHM(d)}`;
-}
 
 interface Meta {
   text: string;
@@ -90,7 +82,7 @@ export function GoalPickSheet({ period, periodStart, onClose }: { period: GoalPe
   };
 
   return (
-    <Sheet title="Ajouter aux objectifs" onClose={onClose}>
+    <Sheet title="Ajouter à la checklist" onClose={onClose}>
       <p className="subtitle" style={{ margin: '-4px 0 12px' }}>
         {periodLabel(period, periodStart, now)}
       </p>

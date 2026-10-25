@@ -1,0 +1,395 @@
+/**
+ * Vues Jour, 3 jours et Semaine : une grille horaire de minuit à minuit, qui défile jour
+ * par jour à l'horizontale (le jour le plus à gauche se cale sur la grille) et s'étire
+ * à la verticale en pinçant (ou Ctrl + molette).
+ */
+
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from 'react';
+import { dayPlan } from '../../core/daily';
+import { addDays, DAY, formatHM, isSameDay, startOfDay } from '../../core/time';
+import { useStore } from '../../state/store';
+import { useNav } from '../../state/nav';
+import { useNow } from '../../ui/kit';
+import { IconFlag, IconTimer } from '../../ui/icons';
+import { formatDayLong } from '../../ui/format';
+import { toneOf } from '../../ui/palette';
+import { WEEKDAY_INITIAL, columnStyle, hourLabel, isAllDay, isTimed, itemKey, layout, minutesOf, quarterAt } from './shared';
+
+/** Largeur de la colonne des heures. */
+const GUTTER = 40;
+/** Jours chargés avant le jour affiché, et en tout. */
+const BEFORE = 28;
+const RANGE = 77;
+/** On recentre quand on approche du bord des jours chargés. */
+const MARGIN = 10;
+
+const HOUR_KEY = 'planning.hourPx';
+/** Hauteur d'une heure : serrée par défaut, de quoi zoomer. */
+export const HOUR_DEFAULT = 32;
+const HOUR_MIN = 18;
+const HOUR_MAX = 180;
+
+const WEEKDAY_SHORT = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'];
+const WEEKDAY_LONG = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
+
+/** Hauteur d'une ligne de titre (12px) dans un bloc étroit. */
+const LINE_PX = 14;
+
+function readHourPx(): number {
+  try {
+    const v = Number(localStorage.getItem(HOUR_KEY));
+    if (v >= HOUR_MIN && v <= HOUR_MAX) return v;
+  } catch {
+    /* stockage indisponible */
+  }
+  return HOUR_DEFAULT;
+}
+
+function writeHourPx(v: number) {
+  try {
+    localStorage.setItem(HOUR_KEY, String(Math.round(v)));
+  } catch {
+    /* préférence non retenue */
+  }
+}
+
+const clampHour = (v: number) => Math.max(HOUR_MIN, Math.min(HOUR_MAX, v));
+
+/** Nombre de jours entre deux dates (minuit à minuit, changements d'heure compris). */
+const daysBetween = (from: Date, to: Date) => Math.round((startOfDay(to).getTime() - startOfDay(from).getTime()) / DAY);
+
+export interface TimelineTarget {
+  day: Date;
+  /** Change à chaque demande de déplacement (flèches, aujourd'hui). */
+  key: number;
+}
+
+export function TimelineView({
+  days,
+  target,
+  onAnchor,
+  onPickDay,
+}: {
+  days: 1 | 3 | 7;
+  target: TimelineTarget;
+  /** Premier jour visible, quand on fait défiler. */
+  onAnchor: (day: Date) => void;
+  onPickDay: (day: Date) => void;
+}) {
+  const { plan, tasks, events, windows, settings, projects, active } = useStore();
+  const { openSheet } = useNav();
+  const now = useNow(60_000);
+
+  const scroller = useRef<HTMLDivElement>(null);
+  const [rangeStart, setRangeStart] = useState(() => addDays(startOfDay(target.day), -BEFORE));
+  const [size, setSize] = useState({ colW: 0, height: 400 });
+  const [hourPx, setHourPxState] = useState(readHourPx);
+  /** Position à appliquer après le prochain rendu (recentrage, zoom). */
+  const pendingLeft = useRef<number | null>(null);
+  const pendingTop = useRef<number | null>(null);
+  const reported = useRef(startOfDay(target.day).getTime());
+  const { colW, height } = size;
+
+  // --- Taille : colonnes à la largeur de l'écran, grille jusqu'en bas -------------
+  useLayoutEffect(() => {
+    const el = scroller.current;
+    if (!el) return;
+    const measure = () => {
+      const top = el.getBoundingClientRect().top + window.scrollY;
+      setSize({ colW: Math.max(40, (el.clientWidth - GUTTER) / days), height: Math.max(240, window.innerHeight - top) });
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    window.addEventListener('resize', measure);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', measure);
+    };
+  }, [days]);
+
+  // --- Aller au jour demandé ----------------------------------------------------------
+  const first = useRef(true);
+  useLayoutEffect(() => {
+    const el = scroller.current;
+    if (!el || !colW) return;
+    const day = startOfDay(target.day);
+    reported.current = day.getTime();
+    const idx = daysBetween(rangeStart, day);
+    if (idx < MARGIN || idx > RANGE - days - MARGIN) {
+      pendingLeft.current = BEFORE * colW;
+      setRangeStart(addDays(day, -BEFORE));
+      return;
+    }
+    el.scrollTo({ left: idx * colW, behavior: first.current ? 'auto' : 'smooth' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [target.key, colW]);
+
+  // Au premier affichage : l'heure actuelle (ou le matin) à l'écran.
+  useLayoutEffect(() => {
+    const el = scroller.current;
+    if (!el || !colW || !first.current) return;
+    first.current = false;
+    const visible = Array.from({ length: days }, (_, i) => addDays(target.day, i));
+    const min = visible.some((d) => isSameDay(d, now)) ? now.getHours() * 60 + now.getMinutes() : 7 * 60;
+    el.scrollTop = Math.max(0, (min / 60) * hourPx - height / 3);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [colW]);
+
+  useLayoutEffect(() => {
+    const el = scroller.current;
+    if (!el) return;
+    if (pendingLeft.current !== null) {
+      el.scrollLeft = pendingLeft.current;
+      pendingLeft.current = null;
+    }
+    if (pendingTop.current !== null) {
+      el.scrollTop = pendingTop.current;
+      pendingTop.current = null;
+    }
+  });
+
+  // --- Défilement horizontal : jour affiché, recentrage --------------------------------
+  const settle = useRef<number>();
+  const onScroll = () => {
+    const el = scroller.current;
+    if (!el || !colW) return;
+    const idx = Math.round(el.scrollLeft / colW);
+    const day = addDays(rangeStart, idx);
+    if (day.getTime() !== reported.current) {
+      reported.current = day.getTime();
+      onAnchor(day);
+    }
+    window.clearTimeout(settle.current);
+    settle.current = window.setTimeout(() => {
+      const i = Math.round(el.scrollLeft / colW);
+      if (i >= MARGIN && i <= RANGE - days - MARGIN) return;
+      const d = addDays(rangeStart, i);
+      pendingLeft.current = BEFORE * colW + (el.scrollLeft - i * colW);
+      setRangeStart(addDays(d, -BEFORE));
+    }, 180);
+  };
+  useEffect(() => () => window.clearTimeout(settle.current), []);
+
+  // --- Zoom vertical : pincer (deux doigts) ou Ctrl + molette ----------------------------
+  const hourRef = useRef(hourPx);
+  hourRef.current = hourPx;
+  const zoomTo = (next: number, focusY: number) => {
+    const el = scroller.current;
+    if (!el) return;
+    const px = clampHour(next);
+    const head = (el.querySelector('.tl__body') as HTMLElement | null)?.offsetTop ?? 0;
+    // Plusieurs pas de zoom peuvent arriver avant le rendu : on part de la position attendue.
+    const top = pendingTop.current ?? el.scrollTop;
+    const minutes = ((top + focusY - head) / hourRef.current) * 60;
+    pendingTop.current = Math.max(0, head + (minutes / 60) * px - focusY);
+    hourRef.current = px;
+    setHourPxState(px);
+  };
+  useEffect(() => {
+    const el = scroller.current;
+    if (!el) return;
+    let pinch: { dist: number; px: number } | null = null;
+    const dist = (t: TouchList) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+    const focus = (t: TouchList) => (t[0].clientY + t[1].clientY) / 2 - el.getBoundingClientRect().top;
+    const onStart = (e: TouchEvent) => {
+      if (e.touches.length === 2) pinch = { dist: Math.max(20, dist(e.touches)), px: hourRef.current };
+    };
+    const onMove = (e: TouchEvent) => {
+      if (!pinch || e.touches.length !== 2) return;
+      e.preventDefault();
+      zoomTo((pinch.px * dist(e.touches)) / pinch.dist, focus(e.touches));
+    };
+    const onEnd = (e: TouchEvent) => {
+      if (pinch && e.touches.length < 2) {
+        pinch = null;
+        writeHourPx(hourRef.current);
+      }
+    };
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      zoomTo(hourRef.current * Math.exp(-e.deltaY / 300), e.clientY - el.getBoundingClientRect().top);
+      writeHourPx(hourRef.current);
+    };
+    el.addEventListener('touchstart', onStart, { passive: true });
+    el.addEventListener('touchmove', onMove, { passive: false });
+    el.addEventListener('touchend', onEnd);
+    el.addEventListener('touchcancel', onEnd);
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => {
+      el.removeEventListener('touchstart', onStart);
+      el.removeEventListener('touchmove', onMove);
+      el.removeEventListener('touchend', onEnd);
+      el.removeEventListener('touchcancel', onEnd);
+      el.removeEventListener('wheel', onWheel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // --- Contenu des jours chargés ---------------------------------------------------------
+  const startKey = rangeStart.getTime();
+  const columns = useMemo(
+    () =>
+      Array.from({ length: RANGE }, (_, i) => {
+        const day = addDays(new Date(startKey), i);
+        const dp = dayPlan(plan, tasks, events, day, { windows, settings });
+        return { day, allDay: dp.items.filter(isAllDay), placed: layout(dp.items.filter(isTimed), day) };
+      }),
+    [startKey, plan, tasks, events, windows, settings],
+  );
+  const atRisk = useMemo(() => new Set(plan.atRisk.map((r) => r.taskId)), [plan.atRisk]);
+  const hasAllDay = columns.some((c) => c.allDay.length > 0);
+
+  const y = (min: number) => (min / 60) * hourPx;
+  const bodyHeight = y(24 * 60);
+  const hours = Array.from({ length: 24 }, (_, h) => h * 60);
+  const wide = colW >= 110;
+  const colorOf = (projectId?: string) => toneOf(projects.find((p) => p.id === projectId)?.color);
+
+  const onColumnClick = (day: Date) => (e: MouseEvent<HTMLDivElement>) => {
+    if (e.target !== e.currentTarget) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    openSheet({ kind: 'add', date: quarterAt(day, 0, hourPx, e.clientY - rect.top) });
+  };
+
+  const style = {
+    height,
+    '--hour': `${hourPx}px`,
+    '--col': `${colW}px`,
+    '--gutter': `${GUTTER}px`,
+  } as CSSProperties;
+
+  return (
+    <div ref={scroller} className={wide ? 'tl tl--wide' : 'tl'} style={style} onScroll={onScroll}>
+      <div className="tl__inner" style={{ width: GUTTER + RANGE * colW }}>
+        <div className="tl__head">
+          <span className="tl__corner" aria-hidden="true" />
+          {columns.map(({ day }) => {
+            const today = isSameDay(day, now);
+            return (
+              <button
+                key={day.getTime()}
+                type="button"
+                className="tl__day"
+                aria-label={`${formatDayLong(day)} — voir la journée`}
+                onClick={() => onPickDay(day)}
+              >
+                <span className="tl__dow" aria-hidden="true">
+                  {colW >= 200 ? WEEKDAY_LONG[day.getDay()] : colW >= 90 ? WEEKDAY_SHORT[day.getDay()] : WEEKDAY_INITIAL[day.getDay()]}
+                </span>
+                <span className={today ? 'tl__num tl__num--today' : 'tl__num'} aria-hidden="true">
+                  {day.getDate()}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {hasAllDay && (
+          <div className="tl__allday">
+            <span className="tl__corner" aria-hidden="true" />
+            {columns.map(({ day, allDay }) => (
+              <div key={day.getTime()} className="tl__allday-col">
+                {allDay.slice(0, 2).map((ev) => (
+                  <button
+                    key={itemKey(ev)}
+                    type="button"
+                    className="tl__allday-item"
+                    aria-label={`Événement ${ev.title}, journée entière`}
+                    onClick={() => openSheet({ kind: 'event', id: ev.eventId })}
+                  >
+                    {ev.title}
+                  </button>
+                ))}
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="tl__body" style={{ height: bodyHeight }}>
+          <div className="tl__gutter" aria-hidden="true">
+            {hours.map((m) => (
+              <span key={m} className="tl__hour" style={{ top: y(m) }}>
+                {m === 0 ? '' : wide ? hourLabel(m) : hourLabel(m).slice(0, 2)}
+              </span>
+            ))}
+          </div>
+
+          {columns.map(({ day, placed }) => {
+            const isToday = isSameDay(day, now);
+            const nowMin = minutesOf(now, day);
+            return (
+              <div key={day.getTime()} className="tl__col" onClick={onColumnClick(day)}>
+                {placed.map((p) => {
+                  const top = y(p.from) + 1;
+                  const h = Math.max(12, y(p.to) - y(p.from) - 2);
+                  const { item } = p;
+                  const when = `${formatHM(item.start)} à ${formatHM(item.end)}`;
+                  const oneLine = h < 34;
+                  const lines = Math.max(1, Math.floor((h - 4) / LINE_PX));
+                  const cls = ['tl__block', item.kind === 'event' && 'tl__block--event', oneLine && 'tl__block--line'];
+                  if (item.kind === 'event') {
+                    return (
+                      <button
+                        key={itemKey(item)}
+                        type="button"
+                        className={cls.filter(Boolean).join(' ')}
+                        style={{ top, height: h, ...columnStyle(p, 2) }}
+                        aria-label={`Événement ${item.title}, ${when}`}
+                        onClick={() => openSheet({ kind: 'event', id: item.eventId })}
+                      >
+                        <span className="tl__title" style={{ WebkitLineClamp: wide && !oneLine ? 1 : lines }}>
+                          {item.title}
+                        </span>
+                        {wide && <span className="tl__time">{formatHM(item.start)}</span>}
+                      </button>
+                    );
+                  }
+                  const running = active?.taskId === item.taskId;
+                  const part = item.part ? ` · ${item.part.index}/${item.part.count}` : '';
+                  if (running) cls.push('tl__block--running');
+                  return (
+                    <button
+                      key={itemKey(item)}
+                      type="button"
+                      className={cls.filter(Boolean).join(' ')}
+                      style={{ top, height: h, '--tone-fill': colorOf(item.projectId).fill, ...columnStyle(p, 2) } as CSSProperties}
+                      aria-label={`${item.title}, ${when}${running ? ', chrono en cours' : ''}`}
+                      onClick={() => openSheet({ kind: 'task', id: item.taskId })}
+                    >
+                      <span className="tl__title" style={{ WebkitLineClamp: wide && !oneLine ? 1 : lines }}>
+                        {running && (
+                          <span className="tl__running" aria-hidden="true">
+                            <IconTimer size={12} />
+                          </span>
+                        )}
+                        {item.title}
+                        {atRisk.has(item.taskId) && (
+                          <span className="tl__risk" aria-hidden="true">
+                            <IconFlag size={11} />
+                          </span>
+                        )}
+                      </span>
+                      {wide && (
+                        <span className="tl__time">
+                          {oneLine ? formatHM(item.start) : `${formatHM(item.start)} – ${formatHM(item.end)}`}
+                          {part}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+                {isToday && (
+                  <div className="tl__now" style={{ top: y(nowMin) - 1 }} aria-hidden="true">
+                    {wide && <span className="tl__now-label">{formatHM(now)}</span>}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}

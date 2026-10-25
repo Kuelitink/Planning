@@ -24,6 +24,8 @@ export function minutesOf(d: Date, day: Date): number {
   return d.getTime() < day.getTime() ? 0 : 24 * 60;
 }
 
+export const WEEKDAY_INITIAL = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
+
 export const hourLabel = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:00`;
 
 export const isTimed = (i: DayItem): i is TimedItem => !(i.kind === 'event' && i.allDay);
@@ -74,25 +76,6 @@ export function columnStyle(p: Placed, gap = 2) {
     left: `calc(${(p.col / p.cols) * 100}% + ${p.col ? gap : 0}px)`,
     width: `calc(${100 / p.cols}% - ${p.cols > 1 ? gap : 0}px)`,
   };
-}
-
-/** Plage horaire à afficher : horaires de la journée élargis aux éléments et à « maintenant » s'il est proche. */
-export function hourRange(dayStartMin: number, dayEndMin: number, placed: Placed[], nowMin: number | null) {
-  let startMin = dayStartMin;
-  let endMin = dayEndMin;
-  for (const p of placed) {
-    startMin = Math.min(startMin, Math.floor(p.from / 60) * 60);
-    endMin = Math.max(endMin, Math.ceil(p.to / 60) * 60);
-  }
-  // On n'élargit pour la ligne « maintenant » que si elle est proche de la plage
-  // (pas de timeline qui commence à minuit quand on ouvre l'app la nuit).
-  if (nowMin !== null && nowMin >= startMin - 120 && nowMin <= endMin + 120) {
-    startMin = Math.min(startMin, Math.floor(nowMin / 60) * 60);
-    endMin = Math.max(endMin, Math.ceil((nowMin + 1) / 60) * 60);
-  }
-  startMin = Math.max(0, startMin);
-  endMin = Math.min(24 * 60, Math.max(endMin, startMin + 60));
-  return { startMin, endMin };
 }
 
 /** Quart d'heure touché dans une colonne de grille, en date. */

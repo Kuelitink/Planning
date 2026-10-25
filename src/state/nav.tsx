@@ -3,16 +3,15 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { GoalPeriod, ID, ISODate, Task } from '../core/types';
 
-export type Mode = 'calendar' | 'checklist' | 'lists' | 'goals' | 'chrono' | 'cycle' | 'settings';
+export type Mode = 'calendar' | 'checklist' | 'lists' | 'chrono' | 'cycle' | 'settings';
 
 /** Modes proposés dans le menu, dans l'ordre (les réglages sont toujours accessibles). */
-export const MODES: Exclude<Mode, 'settings'>[] = ['calendar', 'checklist', 'lists', 'goals', 'chrono', 'cycle'];
+export const MODES: Exclude<Mode, 'settings'>[] = ['calendar', 'checklist', 'lists', 'chrono', 'cycle'];
 
 export const MODE_LABEL: Record<Mode, string> = {
   calendar: 'Calendrier',
   checklist: 'Checklist',
   lists: 'Listes',
-  goals: 'Objectifs',
   chrono: 'Chrono',
   cycle: 'Cycle',
   settings: 'Réglages',
@@ -25,7 +24,7 @@ export type SheetState =
   | { kind: 'task'; id?: ID; defaults?: Partial<Task> }
   | { kind: 'event'; id?: ID; date?: Date }
   | { kind: 'project'; id?: ID }
-  /** Choisir les tâches des objectifs d'une période. */
+  /** Choisir des tâches existantes pour la checklist d'une période. */
   | { kind: 'goalPick'; period: GoalPeriod; periodStart: ISODate }
   | { kind: 'window'; id?: ID }
   /** Choix « Tâche ou événement ? » depuis le bouton + du calendrier. */
@@ -66,7 +65,7 @@ const MODE_KEY = 'planning.mode';
 const VISIBLE_KEY = 'planning.visibleModes';
 /** Modes connus lors du dernier lancement : un mode ajouté depuis s'affiche d'office. */
 const KNOWN_KEY = 'planning.knownModes';
-const MODES_BEFORE_CYCLE: Mode[] = ['calendar', 'checklist', 'lists', 'goals', 'chrono'];
+const MODES_BEFORE_CYCLE: Mode[] = ['calendar', 'checklist', 'lists', 'chrono'];
 
 function readStorage<T>(key: string, fallback: T): T {
   try {
@@ -104,7 +103,9 @@ export function NavProvider({ children }: { children: ReactNode }) {
     return valid.length ? valid : MODES;
   });
   const [mode, setModeState] = useState<Mode>(() => {
-    const saved = readStorage<Mode>(MODE_KEY, 'checklist');
+    const stored = readStorage<string>(MODE_KEY, 'checklist');
+    // L'ancien mode Objectifs fait maintenant partie de la Checklist.
+    const saved = (stored === 'goals' ? 'checklist' : stored) as Mode;
     return saved === 'settings' || visibleModes.includes(saved) ? saved : visibleModes[0];
   });
   const [menuOpen, setMenuOpen] = useState(false);

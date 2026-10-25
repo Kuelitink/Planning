@@ -3,7 +3,7 @@
  * imposent au planificateur, tri « les plus urgentes d'abord » et recherche.
  */
 
-import type { Goal, GoalPeriod, ID, ISODate, Task } from '../core/types';
+import type { Goal, GoalPeriod, ID, ISODate, Priority, Task } from '../core/types';
 import { parseDeadline, type ScheduleResult } from '../core/scheduler';
 import { periodEnd, periodStartFor } from '../core/goals';
 
@@ -43,6 +43,31 @@ export function goalDeadlines(goals: Goal[], now: Date, weekStartsOn: 0 | 1 = 1)
       const cur = out.get(id);
       if (cur === undefined || end < cur) out.set(id, end);
     }
+  }
+  return out;
+}
+
+/** Priorité donnée par la checklist : ASAP pour le jour, haute pour la semaine, normale pour le mois. */
+export const PERIOD_PRIORITY: Record<GoalPeriod, Priority> = { day: 1, week: 2, month: 3 };
+
+export interface ChecklistPick {
+  period: GoalPeriod;
+  /** Fin de la période, en ms. */
+  end: number;
+  /** Place dans la checklist de la période (0 = tout en haut). */
+  index: number;
+}
+
+/** Pour chaque tâche des checklists en cours : la période la plus courte qui la contient, et sa place. */
+export function checklistPicks(goals: Goal[], now: Date, weekStartsOn: 0 | 1 = 1): Map<ID, ChecklistPick> {
+  const out = new Map<ID, ChecklistPick>();
+  for (const period of PERIODS) {
+    const start = periodStartFor(period, now, weekStartsOn);
+    const end = periodEnd(period, start).getTime();
+    pickedTaskIds(goals, period, start).forEach((id, index) => {
+      const cur = out.get(id);
+      if (!cur || end < cur.end) out.set(id, { period, end, index });
+    });
   }
   return out;
 }

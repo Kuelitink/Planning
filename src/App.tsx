@@ -4,7 +4,6 @@ import { ModeMenu, ToastView } from './ui/kit';
 import { CalendarMode } from './modes/CalendarMode';
 import { ChecklistMode } from './modes/ChecklistMode';
 import { ListsMode } from './modes/ListsMode';
-import { GoalsMode } from './modes/GoalsMode';
 import { ChronoMode } from './modes/ChronoMode';
 import { SettingsMode } from './modes/SettingsMode';
 import { CycleMode } from './modes/CycleMode';
@@ -35,8 +34,6 @@ function CurrentMode() {
       return <ChecklistMode />;
     case 'lists':
       return <ListsMode />;
-    case 'goals':
-      return <GoalsMode />;
     case 'chrono':
       return <ChronoMode />;
     case 'cycle':

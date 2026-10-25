@@ -28,168 +28,6 @@
   white-space: nowrap;
 }
 
-.cal-allday {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin: -8px 0 16px 48px;
-}
-
-.cal-allday button {
-  min-height: 32px;
-  padding: 0 12px;
-  border: var(--stroke);
-  border-radius: 999px;
-  background: var(--card);
-  color: var(--ink);
-  font-family: var(--font-display);
-  font-size: 13px;
-  font-weight: 500;
-}
-
-.cal {
-  position: relative;
-  margin-top: 8px;
-  touch-action: pan-y;
-}
-
-.cal__hour {
-  position: absolute;
-  left: 0;
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 1;
-  color: var(--muted);
-  transform: translateY(-50%);
-  pointer-events: none;
-}
-
-.cal__line {
-  position: absolute;
-  left: 44px;
-  right: 0;
-  height: 1px;
-  background: var(--line);
-  pointer-events: none;
-}
-
-.cal__grid {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 48px;
-  right: 0;
-  cursor: pointer;
-}
-
-/* Bloc de tâche : fond pastel de sa liste (--tone-fill), cerné de prune. */
-.cal__block {
-  position: absolute;
-  z-index: 1;
-  overflow: hidden;
-  border: var(--stroke);
-  border-radius: 22px;
-  padding: 10px 15px;
-  background: var(--tone-fill, var(--soft));
-  color: var(--ink);
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-start;
-  gap: 2px;
-  text-align: left;
-}
-
-/* Bloc à peine plus haut qu'une ligne : titre et heure serrés. */
-.cal__block--medium {
-  border-radius: 18px;
-  padding-top: 3px;
-  padding-bottom: 3px;
-  justify-content: center;
-  gap: 0;
-}
-
-.cal__block--small {
-  border-radius: 14px;
-  padding: 0 12px;
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.cal__block--event {
-  border-style: dashed;
-  background: var(--card);
-}
-
-.cal__title {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-family: var(--font-display);
-  font-size: 15px;
-  font-weight: 500;
-}
-
-.cal__title > span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.cal__block--small .cal__title {
-  font-size: 13px;
-}
-
-.cal__time {
-  flex: none;
-  font-size: 12px;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.cal__running {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  color: var(--accent);
-}
-
-.cal__risk {
-  flex: none;
-  display: inline-flex;
-  color: var(--danger);
-}
-
-.cal__now {
-  position: absolute;
-  left: 44px;
-  right: 0;
-  z-index: 3;
-  height: 2px;
-  background: var(--accent);
-  pointer-events: none;
-  scroll-margin: 40vh 0;
-}
-
-/* Pastille jaune avec l'heure, dans la colonne des heures. */
-.cal__now-label {
-  position: absolute;
-  left: -46px;
-  top: 50%;
-  transform: translateY(-50%);
-  padding: 3px 5px;
-  border: var(--stroke);
-  border-radius: 999px;
-  background: var(--pop);
-  color: var(--ink);
-  font-size: 10px;
-  font-weight: 800;
-  line-height: 1;
-}
-
 /* Barre sous l'en-tête : choix de la vue + période précédente / suivante. */
 .cal-bar {
   display: flex;
@@ -203,28 +41,69 @@
   touch-action: pan-y;
 }
 
-/* --- Vue Semaine ---------------------------------------------------------- */
+/* --- Vues Jour, 3 jours, Semaine : grille horaire ----------------------------
+   Grille blanche à traits roses, de minuit à minuit. Elle défile dans les deux sens :
+   jour par jour à l'horizontale (calé sur la grille), heures à la verticale. */
 
-.week {
-  --week-gutter: 30px;
+.app:has(.tl) {
+  padding-bottom: 0;
 }
 
-.week__head,
-.week__allday {
-  display: grid;
-  grid-template-columns: var(--week-gutter) repeat(7, minmax(0, 1fr));
+.tl {
+  --line-soft: #fae0ea;
+  position: relative;
+  margin: 0 -16px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scroll-snap-type: x mandatory;
+  scroll-padding-left: var(--gutter);
+  scrollbar-width: none;
+  touch-action: pan-x pan-y;
+  background: var(--card);
+  border-top: 1px solid var(--line);
 }
 
-.week__head {
+.tl::-webkit-scrollbar {
+  display: none;
+}
+
+.tl__inner {
+  position: relative;
+}
+
+.tl__head,
+.tl__allday {
   position: sticky;
-  top: 0;
-  z-index: 5;
-  padding: 4px 0 6px;
-  background: var(--bg);
+  z-index: 6;
+  display: flex;
+  background: var(--card);
 }
 
-.week__day {
-  min-height: 52px;
+.tl__head {
+  top: 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.tl__allday {
+  top: 52px;
+  padding: 2px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.tl__corner {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  width: var(--gutter);
+  flex: none;
+  align-self: stretch;
+  background: var(--card);
+}
+
+.tl__day {
+  width: var(--col);
+  height: 52px;
+  flex: none;
   padding: 0;
   border: none;
   background: transparent;
@@ -235,47 +114,45 @@
   gap: 2px;
 }
 
-.week__dow {
+.tl__dow {
   font-size: 11px;
   font-weight: 700;
   color: var(--muted);
 }
 
-.week__num {
-  width: 28px;
-  height: 28px;
+.tl__num {
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
   display: grid;
   place-items: center;
   font-family: var(--font-display);
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 500;
 }
 
-.week__num--today,
+.tl__num--today,
 .month__num--today {
   border: var(--stroke);
   background: var(--pop);
   color: var(--ink);
 }
 
-.week__allday {
-  margin-bottom: 4px;
-}
-
-.week__allday-col {
+.tl__allday-col {
+  width: var(--col);
+  flex: none;
   min-width: 0;
-  padding: 0 1px;
+  padding: 0 2px;
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
 
-.week__allday-item {
+.tl__allday-item {
   height: 20px;
-  padding: 0 3px;
+  padding: 0 4px;
   border: 1px solid var(--ink);
-  border-radius: 6px;
+  border-radius: 4px;
   background: var(--card);
   color: var(--ink);
   font-size: 10px;
@@ -286,84 +163,131 @@
   white-space: nowrap;
 }
 
-.week__body {
+.tl__body {
   position: relative;
-  margin-top: 8px;
+  display: flex;
 }
 
-.week__hour {
-  position: absolute;
+/* Colonne des heures, collée à gauche. */
+.tl__gutter {
+  position: sticky;
   left: 0;
-  width: calc(var(--week-gutter) - 6px);
-  text-align: right;
-  font-size: 11px;
+  z-index: 5;
+  width: var(--gutter);
+  flex: none;
+  background: var(--card);
+  border-right: 1px solid var(--line);
+}
+
+.tl__hour {
+  position: absolute;
+  right: 6px;
+  font-size: 10px;
   font-weight: 700;
   line-height: 1;
   color: var(--muted);
   transform: translateY(-50%);
-  pointer-events: none;
 }
 
-.week__line {
-  position: absolute;
-  left: var(--week-gutter);
-  right: 0;
-  height: 1px;
-  background: var(--line);
-  pointer-events: none;
-}
-
-.week__cols {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: var(--week-gutter);
-  right: 0;
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-}
-
-.week__col {
+/* Une colonne par jour : traits roses des heures (et des demi-heures, plus pâles). */
+.tl__col {
   position: relative;
-  border-left: 1px solid var(--line);
+  width: var(--col);
+  flex: none;
+  scroll-snap-align: start;
+  border-right: 1px solid var(--line);
+  background:
+    repeating-linear-gradient(to bottom, var(--line) 0 1px, transparent 1px var(--hour)),
+    repeating-linear-gradient(to bottom, transparent 0 calc(var(--hour) / 2), var(--line-soft) calc(var(--hour) / 2) calc(var(--hour) / 2 + 1px), transparent calc(var(--hour) / 2 + 1px) var(--hour));
   cursor: pointer;
 }
 
-.week__block {
+/* Tâche : fond pastel de sa liste, coins à peine arrondis. */
+.tl__block {
   position: absolute;
   z-index: 1;
   overflow: hidden;
-  padding: 3px 4px;
+  padding: 2px 4px;
   border: 1px solid var(--ink);
-  border-radius: 10px;
+  border-radius: 4px;
   background: var(--tone-fill, var(--soft));
   color: var(--ink);
   text-align: left;
-  display: block;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 1px;
 }
 
-.week__block--event {
+.tl--wide .tl__block {
+  padding: 4px 8px;
+  border-width: 1.5px;
+  border-radius: 6px;
+}
+
+.tl__block--line {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.tl--wide .tl__block--line {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.tl__block--event {
   border-style: dashed;
   background: var(--card);
 }
 
-.week__block--running {
+.tl__block--running {
   box-shadow: inset 0 0 0 2px var(--accent);
 }
 
-.week__title {
+.tl__title {
+  min-width: 0;
   display: -webkit-box;
   -webkit-box-orient: vertical;
   overflow: hidden;
   font-family: var(--font-display);
   font-size: 11px;
-  line-height: 13px;
+  line-height: 14px;
   font-weight: 500;
   overflow-wrap: break-word;
   hyphens: auto;
 }
 
-.week__now {
+.tl--wide .tl__title {
+  font-size: 14px;
+  line-height: 18px;
+}
+
+.tl__time {
+  flex: none;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.tl__running {
+  display: inline-flex;
+  margin-right: 3px;
+  vertical-align: -1px;
+  color: var(--accent);
+}
+
+.tl__risk {
+  display: inline-flex;
+  margin-left: 3px;
+  vertical-align: -1px;
+  color: var(--danger);
+}
+
+.tl__now {
   position: absolute;
   left: 0;
   right: 0;
@@ -371,7 +295,21 @@
   height: 2px;
   background: var(--accent);
   pointer-events: none;
-  scroll-margin: 40vh 0;
+}
+
+.tl__now-label {
+  position: absolute;
+  left: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 2px 5px;
+  border: var(--stroke);
+  border-radius: 999px;
+  background: var(--pop);
+  color: var(--ink);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
 }
 
 /* --- Vue Mois -------------------------------------------------------------- */

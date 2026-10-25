@@ -17,7 +17,6 @@ import {
   IconPlay,
   IconPlus,
   IconSettings,
-  IconTarget,
   IconTimer,
   IconX,
 } from './icons';
@@ -36,7 +35,6 @@ export const MODE_ICON: Record<Mode, (p: { size?: number }) => JSX.Element> = {
   calendar: IconCalendar,
   checklist: IconChecklist,
   lists: IconLists,
-  goals: IconTarget,
   chrono: IconTimer,
   cycle: IconDrop,
   settings: IconSettings,

@@ -1,28 +1,28 @@
-/** Mode Calendrier : vues Jour, Semaine et Mois. */
+/** Mode Calendrier : vues Jour, 3 jours, Semaine et Mois. */
 
 import { useRef, useState, type TouchEvent } from 'react';
-import { addDays, isSameDay, startOfDay, startOfWeek } from '../core/time';
-import { useStore } from '../state/store';
+import { addDays, isSameDay, startOfDay } from '../core/time';
 import { useNav } from '../state/nav';
 import { Fab, Header, Segmented, useNow } from '../ui/kit';
 import { IconChevronLeft, IconChevronRight } from '../ui/icons';
 import { formatDayMonth, formatDayShort, formatMonth } from '../ui/format';
-import { DayView } from './calendar/DayView';
-import { WeekView } from './calendar/WeekView';
+import { TimelineView, type TimelineTarget } from './calendar/TimelineView';
 import { MonthView } from './calendar/MonthView';
 import { proposedDate } from './calendar/shared';
 import './calendar.css';
 
-type View = 'day' | 'week' | 'month';
+type View = 'day' | 'three' | 'week' | 'month';
 
 const VIEW_KEY = 'planning.calendarView';
-/** Glissement horizontal minimal pour changer de période. */
+/** Glissement horizontal minimal pour changer de mois. */
 const SWIPE_PX = 60;
+/** Jours visibles à la fois dans les vues à grille horaire. */
+const VISIBLE: Record<Exclude<View, 'month'>, 1 | 3 | 7> = { day: 1, three: 3, week: 7 };
 
 function readView(): View {
   try {
     const v = localStorage.getItem(VIEW_KEY);
-    if (v === 'day' || v === 'week' || v === 'month') return v;
+    if (v === 'day' || v === 'three' || v === 'week' || v === 'month') return v;
   } catch {
     /* stockage indisponible */
   }
@@ -30,22 +30,30 @@ function readView(): View {
 }
 
 /** « 19–25 oct. », ou « 28 sept.–4 oct. » à cheval sur deux mois. */
-function weekLabel(start: Date): string {
-  const end = addDays(start, 6);
+function rangeLabel(start: Date, days: number): string {
+  const end = addDays(start, days - 1);
   return start.getMonth() === end.getMonth() ? `${start.getDate()}–${formatDayMonth(end)}` : `${formatDayMonth(start)}–${formatDayMonth(end)}`;
 }
 
 export function CalendarMode() {
-  const { settings } = useStore();
   const { openSheet } = useNav();
   const now = useNow(60_000);
   const [view, setViewState] = useState<View>(readView);
-  /** Jour de référence : jour affiché, jour dans la semaine, jour choisi dans le mois. */
+  /** Jour de référence : premier jour visible, ou jour choisi dans le mois. */
   const [anchor, setAnchor] = useState(() => startOfDay(new Date()));
-  const weekStart = startOfWeek(anchor, settings.weekStartsOn);
+  /** Jour vers lequel la grille horaire doit défiler (flèches, aujourd'hui, changement de vue). */
+  const [target, setTarget] = useState<TimelineTarget>(() => ({ day: startOfDay(new Date()), key: 0 }));
+  const days = view === 'month' ? 0 : VISIBLE[view];
+
+  const goTo = (day: Date) => {
+    const d = startOfDay(day);
+    setAnchor(d);
+    setTarget((t) => ({ day: d, key: t.key + 1 }));
+  };
 
   const setView = (v: View) => {
     setViewState(v);
+    goTo(anchor);
     try {
       localStorage.setItem(VIEW_KEY, v);
     } catch {
@@ -54,8 +62,7 @@ export function CalendarMode() {
   };
 
   const step = (dir: 1 | -1) => {
-    if (view === 'day') setAnchor((d) => addDays(d, dir));
-    else if (view === 'week') setAnchor((d) => addDays(d, 7 * dir));
+    if (view !== 'month') goTo(addDays(anchor, days * dir));
     else
       setAnchor((d) => {
         // Mois voisin : aujourd'hui s'il en fait partie, sinon le 1er.
@@ -66,19 +73,19 @@ export function CalendarMode() {
   };
 
   const openDay = (day: Date) => {
-    setAnchor(startOfDay(day));
-    setView('day');
+    setViewState('day');
+    goTo(day);
   };
 
-  const label = view === 'day' ? formatDayShort(anchor) : view === 'week' ? weekLabel(weekStart) : formatMonth(anchor);
+  const label = view === 'day' ? formatDayShort(anchor) : view === 'month' ? formatMonth(anchor) : rangeLabel(anchor, days);
   const isCurrent =
-    view === 'day'
-      ? isSameDay(anchor, now)
-      : view === 'week'
-        ? isSameDay(weekStart, startOfWeek(now, settings.weekStartsOn))
-        : anchor.getFullYear() === now.getFullYear() && anchor.getMonth() === now.getMonth();
+    view === 'month'
+      ? anchor.getFullYear() === now.getFullYear() && anchor.getMonth() === now.getMonth()
+      : view === 'day'
+        ? isSameDay(anchor, now)
+        : anchor <= now && now < addDays(anchor, days);
 
-  // Glisser à gauche / à droite : période suivante / précédente.
+  // Mois : glisser à gauche / à droite pour le mois suivant / précédent.
   const touch = useRef<{ x: number; y: number } | null>(null);
   const onTouchStart = (e: TouchEvent) => {
     const t = e.touches[0];
@@ -102,7 +109,7 @@ export function CalendarMode() {
             type="button"
             className="cal-nav__date"
             aria-label={isCurrent ? label : `${label} — revenir à aujourd'hui`}
-            onClick={() => setAnchor(startOfDay(new Date()))}
+            onClick={() => goTo(new Date())}
           >
             {label}
           </button>
@@ -116,7 +123,8 @@ export function CalendarMode() {
           onChange={setView}
           options={[
             { value: 'day', label: 'Jour' },
-            { value: 'week', label: 'Semaine' },
+            { value: 'three', label: '3 j', ariaLabel: '3 jours' },
+            { value: 'week', label: 'Sem.', ariaLabel: 'Semaine' },
             { value: 'month', label: 'Mois' },
           ]}
         />
@@ -130,11 +138,13 @@ export function CalendarMode() {
         </div>
       </div>
 
-      <div className="cal-swipe" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
-        {view === 'day' && <DayView day={anchor} />}
-        {view === 'week' && <WeekView weekStart={weekStart} onPickDay={openDay} />}
-        {view === 'month' && <MonthView month={anchor} selected={anchor} onSelect={(d) => setAnchor(startOfDay(d))} onOpenDay={openDay} />}
-      </div>
+      {view === 'month' ? (
+        <div className="cal-swipe" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+          <MonthView month={anchor} selected={anchor} onSelect={(d) => setAnchor(startOfDay(d))} onOpenDay={openDay} />
+        </div>
+      ) : (
+        <TimelineView key={view} days={VISIBLE[view]} target={target} onAnchor={setAnchor} onPickDay={openDay} />
+      )}
 
       <Fab onClick={() => openSheet({ kind: 'add', date: proposedDate(anchor, now) })} />
     </>

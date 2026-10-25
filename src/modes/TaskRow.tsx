@@ -3,7 +3,7 @@
 import { useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import type { ID, Task } from '../core/types';
 import type { ScheduledBlock, UnscheduledReason } from '../core/scheduler';
-import { formatHM, isSameDay } from '../core/time';
+import { formatHM, isDateOnly, isSameDay, parseDateTime } from '../core/time';
 import { useStore } from '../state/store';
 import { useNav } from '../state/nav';
 import { Dot, PriorityCheck } from '../ui/kit';
@@ -51,8 +51,15 @@ export function plannedLabel(index: PlanIndex, taskId: ID, now: Date): string | 
   return reason ? REASON_LABEL[reason] : undefined;
 }
 
+/** Échéance courte : « Auj. », « Demain », « Mer. 21 oct. », avec l'heure si elle en a une. */
+export function shortDeadline(s: string, now: Date): string {
+  const d = parseDateTime(s);
+  const day = isSameDay(d, now) ? 'Auj.' : formatRelativeDay(d, now);
+  return isDateOnly(s) ? day : `${day} ${formatHM(d)}`;
+}
+
 /** Ligne : case (priorité), titre (ouvre la fiche), info à droite, point de la liste. */
-export function TaskRow({ task, meta, late }: { task: Task; meta?: string; late?: boolean }) {
+export function TaskRow({ task, meta, late, indent }: { task: Task; meta?: string; late?: boolean; indent?: number }) {
   const { projects, setTaskDone, active } = useStore();
   const { openSheet, showToast } = useNav();
   const project = task.projectId ? projects.find((p) => p.id === task.projectId) : undefined;
@@ -67,7 +74,7 @@ export function TaskRow({ task, meta, late }: { task: Task; meta?: string; late?
   };
 
   return (
-    <li className={running ? 'row row--running' : 'row'}>
+    <li className={running ? 'row row--running' : 'row'} style={indent ? { marginLeft: indent } : undefined}>
       <PriorityCheck
         priority={task.priority}
         checked={done}

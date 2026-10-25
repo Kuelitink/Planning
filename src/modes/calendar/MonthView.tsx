@@ -10,8 +10,7 @@ import { useNow } from '../../ui/kit';
 import { IconCalendar } from '../../ui/icons';
 import { formatDayLong } from '../../ui/format';
 import { toneOf } from '../../ui/palette';
-import { itemsByDay, type MonthItem } from './shared';
-import { WEEKDAY_INITIAL } from './WeekView';
+import { WEEKDAY_INITIAL, itemsByDay, type MonthItem } from './shared';
 import '../cycle.css';
 
 /** Points affichés au plus par cellule (au-delà : « +n »). */

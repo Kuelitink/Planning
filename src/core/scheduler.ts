@@ -20,8 +20,9 @@
  *    priorité, et une échéance lointaine ne compte pas plus que cette échéance
  *    virtuelle : une P1 sans échéance passe avant une P3 due dans un mois, mais
  *    une P4 due dans 2 heures passe avant la P1. À clé égale : priorité, puis
- *    échéance effective la plus proche, puis durée la plus courte, puis date de
- *    création.
+ *    rang (`ranks` : place dans la checklist, sinon ordre des listes : à priorité
+ *    égale, la liste du dessus passe avant celle du dessous), puis échéance
+ *    effective la plus proche, puis durée la plus courte, puis date de création.
  *
  *    L'échéance et la priorité « effectives » se propagent vers l'amont des
  *    dépendances : si C (due vendredi, P1) dépend de B, B hérite d'une échéance
@@ -51,6 +52,8 @@ export interface ScheduleInput {
   projects?: Project[];
   settings: Settings;
   now: Date;
+  /** Rang de chaque tâche, départage à priorité égale (plus petit = plus urgent ; absent = en dernier). */
+  ranks?: Map<ID, number>;
 }
 
 export interface ScheduledBlock {
@@ -158,9 +161,11 @@ export function schedule(input: ScheduleInput): ScheduleResult {
 
   const urgencyKey = (t: Task) =>
     Math.min(effDeadline.get(t.id)!, nowMs + PRIORITY_HORIZON_DAYS[effPriority.get(t.id)!] * DAY);
+  const rankOf = (t: Task) => input.ranks?.get(t.id) ?? Number.MAX_SAFE_INTEGER;
   const compare = (a: Task, b: Task) =>
     urgencyKey(a) - urgencyKey(b) ||
     effPriority.get(a.id)! - effPriority.get(b.id)! ||
+    rankOf(a) - rankOf(b) ||
     effDeadline.get(a.id)! - effDeadline.get(b.id)! ||
     a.durationMin - b.durationMin ||
     a.createdAt.localeCompare(b.createdAt) ||
