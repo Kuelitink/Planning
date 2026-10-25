@@ -126,7 +126,7 @@
 
 .tl__day.cy-day--predicted {
   border-style: dashed;
-  border-color: var(--cy-period);
+  border-color: var(--cy-predicted-line);
 }
 
 .tl__day.cy-day .tl__dow {
@@ -407,7 +407,7 @@
 }
 
 .month__cell.cy-day--period .month__more {
-  color: #fff;
+  color: var(--cy-period-ink);
 }
 
 .month__num {

@@ -10,6 +10,12 @@
   --cy-fertile-soft: #b9d6f5; /* fenêtre fertile : bleu clair */
   --cy-pms: #7a4bd6;
   --cy-pms-soft: #e4cdf3; /* SPM : mauve pastel */
+  /* Cases des calendriers et secteurs de l'anneau : teintes très claires (peu de contraste). */
+  --cy-period-fill: #fbd9de; /* règles notées : rose clair, chiffre rouge sombre */
+  --cy-predicted-fill: #fdf2f4; /* règles prévues : rose à peine teinté, trait pointillé */
+  --cy-predicted-line: #e58a98;
+  --cy-fertile-fill: #e6f0fc; /* fenêtre fertile : bleu très clair */
+  --cy-pms-fill: #f3ebfb; /* SPM : mauve très clair */
   /* Barres neutres des analyses. */
   --cy-past: #f6dbe5;
 }
@@ -245,26 +251,26 @@
 
 /* --- Phase d'un jour (bande, calendriers, légende) ------------------------- */
 
-/* La case entière prend la couleur de la phase (double classe : passe avant le fond des cases). */
+/* La case entière prend la teinte (claire) de la phase (double classe : passe avant le fond des cases). */
 .cy-day.cy-day--period {
-  background: var(--cy-period);
-  color: #fff;
+  background: var(--cy-period-fill);
+  color: var(--cy-period-ink);
 }
 
 .cy-day.cy-day--predicted {
   border-style: dashed;
-  border-color: var(--cy-period);
-  background: var(--cy-predicted);
+  border-color: var(--cy-predicted-line);
+  background: var(--cy-predicted-fill);
   color: var(--ink);
 }
 
 .cy-day.cy-day--fertile {
-  background: var(--cy-fertile-soft);
+  background: var(--cy-fertile-fill);
   color: var(--ink);
 }
 
 .cy-day.cy-day--pms {
-  background: var(--cy-pms-soft);
+  background: var(--cy-pms-fill);
   color: var(--ink);
 }
 
@@ -313,7 +319,7 @@
 }
 
 .cy-day--period .cy-logdot {
-  background: #fff;
+  background: var(--cy-period-ink);
 }
 
 .cy-spot {

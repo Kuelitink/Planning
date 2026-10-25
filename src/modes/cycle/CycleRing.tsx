@@ -31,12 +31,12 @@ function sector(a0: number, a1: number): string {
 }
 
 const SEGMENT: Record<DayPhase, CSSProperties> = {
-  period: { fill: 'var(--cy-period)' },
-  // Prévu : couleur désaturée et trait pointillé, comme dans le calendrier.
-  predicted: { fill: 'var(--cy-predicted)', stroke: 'var(--cy-period)', strokeDasharray: '4 2.5' },
-  fertile: { fill: 'var(--cy-fertile-soft)' },
-  ovulation: { fill: 'var(--cy-fertile-soft)' },
-  pms: { fill: 'var(--cy-pms-soft)' },
+  period: { fill: 'var(--cy-period-fill)' },
+  // Prévu : teinte à peine marquée et trait pointillé, comme dans le calendrier.
+  predicted: { fill: 'var(--cy-predicted-fill)', stroke: 'var(--cy-predicted-line)', strokeDasharray: '4 2.5' },
+  fertile: { fill: 'var(--cy-fertile-fill)' },
+  ovulation: { fill: 'var(--cy-fertile-fill)' },
+  pms: { fill: 'var(--cy-pms-fill)' },
 };
 
 function segmentStyle(phase: DayPhase | undefined): CSSProperties {
