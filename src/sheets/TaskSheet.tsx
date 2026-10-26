@@ -401,6 +401,29 @@ export function TaskSheet({ id, defaults, onClose }: { id?: ID; defaults?: Parti
           </p>
         )}
 
+        {task?.pinned && task.status === 'todo' && (
+          <div className="pinned-slot">
+            <span>
+              Créneau fixé : {formatRelativeDay(parseDateTime(task.pinned.start)).toLowerCase()}{' '}
+              {formatHM(parseDateTime(task.pinned.start))}–{formatHM(parseDateTime(task.pinned.end))}
+            </span>
+            <button
+              type="button"
+              className="pill pill--sm"
+              onClick={() => {
+                const before = task.pinned;
+                store.saveTask({ ...task, pinned: undefined });
+                showToast({
+                  message: 'Créneau libéré : la tâche est auto-planifiée',
+                  action: { label: 'Annuler', run: () => store.saveTask({ ...task, pinned: before }) },
+                });
+              }}
+            >
+              Libérer
+            </button>
+          </div>
+        )}
+
         <div className="sheet__actions">
           <button type="submit" className="btn btn--primary btn--block" disabled={!title.trim()} style={title.trim() ? undefined : { opacity: 0.5 }}>
             Enregistrer

@@ -24,7 +24,10 @@ dépendances, horaires, découpage) sont dans sa fiche : on l'ouvre en touchant 
 - **Listes** : même fonctionnement que la Checklist (appui long pour réordonner, glisser à
   droite pour une sous-tâche) ; à priorité égale, une tâche plus haut dans sa liste est
   planifiée avant.
-- **Planning** : une case sur chaque tâche de la grille pour la terminer sans ouvrir sa fiche.
+- **Planning** : une case sur chaque tâche de la grille pour la terminer sans ouvrir sa fiche ;
+  un champ « + Ajouter une tâche… » au-dessus de la grille (la tâche rejoint la checklist du
+  jour affiché) ; appui long sur une tâche puis glisser pour la poser à l'heure et au jour
+  voulus (créneau fixé, au quart d'heure, que la fiche permet de « Libérer »).
 - **Chrono** : la tâche en haut avec le temps déjà passé dessus, un cercle avec le temps, le
   statut, play/pause et « Terminer », puis « Changer de tâche » (les plus probables d'abord,
   et une recherche). Glisser vers la droite : le minuteur (5 à 60 min). Chaque arrêt ajoute

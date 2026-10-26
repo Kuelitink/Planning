@@ -804,3 +804,17 @@ button {
     transition: none !important;
   }
 }
+
+/* Fiche tâche : créneau fixé à la main (déplacé dans le planning). */
+.pinned-slot {
+  margin-top: 12px;
+  padding: 8px 8px 8px 14px;
+  border: 1.5px dashed var(--ink);
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 700;
+}

@@ -2,15 +2,18 @@
  * Vues Jour, 3 jours et Semaine : une grille horaire de minuit à minuit, qui défile jour
  * par jour à l'horizontale (le jour le plus à gauche se cale sur la grille) et s'étire
  * à la verticale en pinçant (ou Ctrl + molette).
+ *
+ * Appui long sur une tâche puis glisser : on la pose à l'heure et au jour voulus (créneau
+ * fixé, au quart d'heure) ; l'auto-planification place les autres tâches autour.
  */
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { dayPlan } from '../../core/daily';
-import { addDays, DAY, formatHM, isSameDay, startOfDay, toISODate } from '../../core/time';
+import { addDays, atMinutes, DAY, formatHM, isSameDay, MINUTE, startOfDay, toISODate } from '../../core/time';
 import { useStore } from '../../state/store';
 import { useNav } from '../../state/nav';
 import { useNow } from '../../ui/kit';
-import { IconFlag, IconTimer } from '../../ui/icons';
+import { IconFlag, IconPin, IconTimer } from '../../ui/icons';
 import { formatDayLong } from '../../ui/format';
 import { PRIORITY_COLOR, toneOf } from '../../ui/palette';
 import { OvulationDot, dayPhase, describeMark, phaseClass, useCalendarMarks } from '../cycle/shared';
@@ -60,6 +63,35 @@ const clampHour = (v: number) => Math.max(HOUR_MIN, Math.min(HOUR_MAX, v));
 /** Nombre de jours entre deux dates (minuit à minuit, changements d'heure compris). */
 const daysBetween = (from: Date, to: Date) => Math.round((startOfDay(to).getTime() - startOfDay(from).getTime()) / DAY);
 
+/** Tâche en cours de déplacement. */
+interface Move {
+  taskId: string;
+  durMin: number;
+  /** Minutes entre le haut du bloc et le doigt. */
+  grabMin: number;
+  x: number;
+  y: number;
+  timer: number;
+  dragging: boolean;
+  lastX: number;
+  lastY: number;
+}
+
+/** Aperçu de la future place : colonne (jour chargé) et minute de début. */
+interface Ghost {
+  taskId: string;
+  col: number;
+  min: number;
+  durMin: number;
+  title: string;
+  fill: string;
+}
+
+/** Appui long avant de pouvoir déplacer une tâche. */
+const LONG_PRESS_MS = 400;
+/** Pas de placement, en minutes. */
+const SNAP_MIN = 15;
+
 export interface TimelineTarget {
   day: Date;
   /** Change à chaque demande de déplacement (flèches, aujourd'hui). */
@@ -78,7 +110,7 @@ export function TimelineView({
   onAnchor: (day: Date) => void;
   onPickDay: (day: Date) => void;
 }) {
-  const { plan, tasks, events, windows, settings, projects, active, setTaskDone } = useStore();
+  const { plan, tasks, events, windows, settings, projects, active, setTaskDone, saveTask } = useStore();
   const { openSheet, showToast } = useNav();
 
   /** Cocher une tâche dans la grille : terminée (elle quitte le planning), avec « Annuler ». */
@@ -170,6 +202,8 @@ export function TimelineView({
     }
     window.clearTimeout(settle.current);
     settle.current = window.setTimeout(() => {
+      // Pas de recentrage pendant un déplacement : la colonne visée changerait de jour.
+      if (moveRef.current?.dragging) return;
       const i = Math.round(el.scrollLeft / colW);
       if (i >= MARGIN && i <= RANGE - days - MARGIN) return;
       const d = addDays(rangeStart, i);
@@ -178,6 +212,13 @@ export function TimelineView({
     }, 180);
   };
   useEffect(() => () => window.clearTimeout(settle.current), []);
+
+  // --- Déplacer une tâche : appui long puis glisser -------------------------------------
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const moveRef = useRef<Move | null>(null);
+  /** Un déplacement vient de finir : le clic qui suit (s'il y en a un) n'ouvre pas la fiche. */
+  const swallowClick = useRef(false);
+  const [ghost, setGhost] = useState<Ghost | null>(null);
 
   // --- Zoom vertical : pincer (deux doigts) ou Ctrl + molette ----------------------------
   const hourRef = useRef(hourPx);
@@ -204,6 +245,10 @@ export function TimelineView({
       if (e.touches.length === 2) pinch = { dist: Math.max(20, dist(e.touches)), px: hourRef.current };
     };
     const onMove = (e: TouchEvent) => {
+      if (moveRef.current?.dragging) {
+        if (e.cancelable) e.preventDefault();
+        return;
+      }
       if (!pinch || e.touches.length !== 2) return;
       e.preventDefault();
       zoomTo((pinch.px * dist(e.touches)) / pinch.dist, focus(e.touches));
@@ -257,6 +302,127 @@ export function TimelineView({
   const hours = Array.from({ length: 24 }, (_, h) => h * 60);
   const wide = colW >= 110;
   const colorOf = (projectId?: string) => toneOf(projects.find((p) => p.id === projectId)?.color);
+
+  /** Colonne et minute sous le doigt (le haut du bloc suit le doigt, au quart d'heure). */
+  const targetAt = (m: Move): { col: number; min: number } | null => {
+    const body = bodyRef.current?.getBoundingClientRect();
+    if (!body || !colW) return null;
+    const col = Math.max(0, Math.min(RANGE - 1, Math.floor((m.lastX - body.left - GUTTER) / colW)));
+    const raw = ((m.lastY - body.top) / hourPx) * 60 - m.grabMin;
+    const min = Math.max(0, Math.min(24 * 60 - m.durMin, Math.round(raw / SNAP_MIN) * SNAP_MIN));
+    return { col, min };
+  };
+
+  const updateGhost = () => {
+    const m = moveRef.current;
+    if (!m?.dragging) return;
+    const t = targetAt(m);
+    const task = tasks.find((x) => x.id === m.taskId);
+    if (!t || !task) return;
+    setGhost({ taskId: m.taskId, ...t, durMin: m.durMin, title: task.title, fill: colorOf(task.projectId).fill });
+  };
+
+  const endMove = () => {
+    const m = moveRef.current;
+    if (m) window.clearTimeout(m.timer);
+    moveRef.current = null;
+    setGhost(null);
+    scroller.current?.classList.remove('tl--dragging');
+  };
+
+  const onBlockPointerDown = (taskId: string, e: ReactPointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0 || (e.target as HTMLElement).closest('.tl__checkhit')) return;
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task) return;
+    endMove();
+    const el = e.currentTarget;
+    const pointerId = e.pointerId;
+    const grabMin = ((e.clientY - el.getBoundingClientRect().top) / hourPx) * 60;
+    const m: Move = {
+      taskId,
+      durMin: Math.max(SNAP_MIN, task.durationMin),
+      grabMin: Math.min(grabMin, Math.max(0, task.durationMin - SNAP_MIN)),
+      x: e.clientX,
+      y: e.clientY,
+      lastX: e.clientX,
+      lastY: e.clientY,
+      dragging: false,
+      timer: window.setTimeout(() => {
+        m.dragging = true;
+        try {
+          el.setPointerCapture(pointerId);
+        } catch {
+          /* pointeur déjà relâché */
+        }
+        scroller.current?.classList.add('tl--dragging');
+        navigator.vibrate?.(12);
+        updateGhost();
+      }, LONG_PRESS_MS),
+    };
+    moveRef.current = m;
+  };
+
+  const onBlockPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const m = moveRef.current;
+    if (!m) return;
+    m.lastX = e.clientX;
+    m.lastY = e.clientY;
+    if (!m.dragging) {
+      // Le doigt bouge avant l'appui long : on fait défiler, pas de déplacement.
+      if (Math.hypot(e.clientX - m.x, e.clientY - m.y) > 8) endMove();
+      return;
+    }
+    updateGhost();
+  };
+
+  const onBlockPointerUp = () => {
+    const m = moveRef.current;
+    if (m?.dragging) {
+      const t = targetAt(m);
+      const task = tasks.find((x) => x.id === m.taskId);
+      swallowClick.current = true;
+      window.setTimeout(() => (swallowClick.current = false), 350);
+      if (t && task) {
+        const start = atMinutes(columns[t.col].day, t.min);
+        const end = new Date(start.getTime() + m.durMin * MINUTE);
+        const before = task.pinned;
+        saveTask({ ...task, pinned: { start: start.toISOString(), end: end.toISOString() } });
+        showToast({
+          message: `Placée ${formatDayLong(start).toLowerCase()} à ${formatHM(start)}`,
+          action: { label: 'Annuler', run: () => saveTask({ ...task, pinned: before }) },
+        });
+      }
+    }
+    endMove();
+  };
+
+  // Près du bord pendant un déplacement : la grille défile toute seule.
+  useEffect(() => {
+    if (!ghost) return;
+    let raf = 0;
+    const tick = () => {
+      const m = moveRef.current;
+      const el = scroller.current;
+      if (m?.dragging && el) {
+        const r = el.getBoundingClientRect();
+        const dy = m.lastY < r.top + 70 ? -10 : m.lastY > r.bottom - 50 ? 10 : 0;
+        const dx = m.lastX > r.right - 24 ? 8 : m.lastX < r.left + GUTTER + 8 ? -8 : 0;
+        if (dx || dy) {
+          el.scrollBy(dx, dy);
+          updateGhost();
+        }
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ghost !== null]);
+
+  const openTask = (taskId: string) => {
+    if (swallowClick.current) return;
+    openSheet({ kind: 'task', id: taskId });
+  };
 
   const onColumnClick = (day: Date) => (e: MouseEvent<HTMLDivElement>) => {
     if (e.target !== e.currentTarget) return;
@@ -324,7 +490,7 @@ export function TimelineView({
           </div>
         )}
 
-        <div className="tl__body" style={{ height: bodyHeight }}>
+        <div ref={bodyRef} className="tl__body" style={{ height: bodyHeight }}>
           <div className="tl__gutter" aria-hidden="true">
             {hours.map((m) => (
               <span key={m} className="tl__hour" style={{ top: y(m) }}>
@@ -366,11 +532,17 @@ export function TimelineView({
                   const running = active?.taskId === item.taskId;
                   const part = item.part ? ` · ${item.part.index}/${item.part.count}` : '';
                   if (running) cls.push('tl__block--running');
+                  if (ghost?.taskId === item.taskId) cls.push('tl__block--moving');
                   return (
                     <div
                       key={itemKey(item)}
                       className={cls.filter(Boolean).join(' ')}
                       style={{ top, height: h, '--tone-fill': colorOf(item.projectId).fill, ...columnStyle(p, 2) } as CSSProperties}
+                      onPointerDown={(e) => onBlockPointerDown(item.taskId, e)}
+                      onPointerMove={onBlockPointerMove}
+                      onPointerUp={onBlockPointerUp}
+                      onPointerCancel={endMove}
+                      onContextMenu={(e) => e.preventDefault()}
                     >
                       <label className="tl__checkhit">
                         <input
@@ -385,13 +557,18 @@ export function TimelineView({
                       <button
                         type="button"
                         className="tl__open"
-                        aria-label={`${item.title}, ${when}${running ? ', chrono en cours' : ''}`}
-                        onClick={() => openSheet({ kind: 'task', id: item.taskId })}
+                        aria-label={`${item.title}, ${when}${item.pinned ? ', créneau fixé' : ''}${running ? ', chrono en cours' : ''}`}
+                        onClick={() => openTask(item.taskId)}
                       >
                         <span className="tl__title" style={{ WebkitLineClamp: wide && !oneLine ? 1 : lines }}>
                           {running && (
                             <span className="tl__running" aria-hidden="true">
                               <IconTimer size={12} />
+                            </span>
+                          )}
+                          {item.pinned && (
+                            <span className="tl__pin" aria-hidden="true">
+                              <IconPin size={11} />
                             </span>
                           )}
                           {item.title}
@@ -411,6 +588,17 @@ export function TimelineView({
                     </div>
                   );
                 })}
+                {ghost && columns[ghost.col]?.day.getTime() === day.getTime() && (
+                  <div
+                    className="tl__block tl__block--ghost"
+                    style={{ top: y(ghost.min) + 1, height: Math.max(12, y(ghost.min + ghost.durMin) - y(ghost.min) - 2), left: 0, width: '100%', '--tone-fill': ghost.fill } as CSSProperties}
+                    aria-hidden="true"
+                  >
+                    <span className="tl__title" style={{ WebkitLineClamp: 1 }}>
+                      {formatHM(atMinutes(day, ghost.min))} · {ghost.title}
+                    </span>
+                  </div>
+                )}
                 {isToday && (
                   <div className="tl__now" style={{ top: y(nowMin) - 1 }} aria-hidden="true">
                     {wide && <span className="tl__now-label">{formatHM(now)}</span>}

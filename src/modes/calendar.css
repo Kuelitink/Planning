@@ -37,6 +37,15 @@
   margin: -8px 0 16px;
 }
 
+/* Ajout rapide d'une tâche, au-dessus de la grille horaire. */
+.cal-add {
+  margin: -6px 0 10px;
+}
+
+.cal-add .text-input {
+  height: 44px;
+}
+
 .cal-swipe {
   touch-action: pan-y;
 }
@@ -257,6 +266,38 @@
   gap: 6px;
   padding-top: 0;
   padding-bottom: 0;
+}
+
+/* Déplacement d'une tâche (appui long) : pas d'aimantation des jours pendant le geste. */
+.tl--dragging {
+  scroll-snap-type: none;
+}
+
+.tl__block:not(.tl__block--event) {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.tl__block--moving {
+  opacity: 0.35;
+}
+
+/* Place visée : le bloc suit le doigt, au quart d'heure. */
+.tl__block--ghost {
+  z-index: 4;
+  border-width: 1.5px;
+  box-shadow:
+    0 0 0 2px var(--accent),
+    0 8px 18px rgba(58, 15, 36, 0.2);
+  pointer-events: none;
+}
+
+.tl__pin {
+  display: inline-flex;
+  margin-right: 3px;
+  vertical-align: -1px;
+  color: var(--muted);
 }
 
 /* Tâche : case à cocher, puis le reste du bloc (ouvre la fiche). */
