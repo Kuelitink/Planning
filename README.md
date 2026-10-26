@@ -27,7 +27,10 @@ dépendances, horaires, découpage) sont dans sa fiche : on l'ouvre en touchant 
 - **Planning** : une case sur chaque tâche de la grille pour la terminer sans ouvrir sa fiche ;
   un champ « + Ajouter une tâche… » au-dessus de la grille (la tâche rejoint la checklist du
   jour affiché) ; appui long sur une tâche puis glisser pour la poser à l'heure et au jour
-  voulus (créneau fixé, au quart d'heure, que la fiche permet de « Libérer »).
+  voulus (créneau fixé, au quart d'heure) ; le bouton + ouvre la même recherche que dans la
+  Checklist (pour le jour affiché), avec « Tâche à heure fixe » et « Événement ».
+- **Heure fixe** : dans la fiche d'une tâche, l'interrupteur « Heure fixe » la pose « le … de …
+  à … » ; décoché, elle repasse à l'auto-planification.
 - **Chrono** : la tâche en haut avec le temps déjà passé dessus, un cercle avec le temps, le
   statut, play/pause et « Terminer », puis « Changer de tâche » (les plus probables d'abord,
   et une recherche). Glisser vers la droite : le minuteur (5 à 60 min). Chaque arrêt ajoute

@@ -185,7 +185,15 @@ export function CalendarMode() {
         <TimelineView key={view} days={VISIBLE[view]} target={target} onAnchor={setAnchor} onPickDay={openDay} />
       )}
 
-      <Fab onClick={() => openSheet({ kind: 'add', date: proposedDate(anchor, now) })} />
+      <Fab
+        label="Ajouter au planning"
+        onClick={() => {
+          // Même recherche que dans la Checklist, pour le jour affiché (aujourd'hui s'il est passé).
+          const today = startOfDay(new Date());
+          const day = anchor < today ? today : anchor;
+          openSheet({ kind: 'goalPick', period: 'day', periodStart: toISODate(day), at: proposedDate(day, now) });
+        }}
+      />
     </>
   );
 }

@@ -24,8 +24,11 @@ export type SheetState =
   | { kind: 'task'; id?: ID; defaults?: Partial<Task> }
   | { kind: 'event'; id?: ID; date?: Date }
   | { kind: 'project'; id?: ID }
-  /** Choisir des tâches existantes pour la checklist d'une période. */
-  | { kind: 'goalPick'; period: GoalPeriod; periodStart: ISODate }
+  /**
+   * Choisir des tâches existantes pour la checklist d'une période. Depuis le Calendrier,
+   * `at` (l'heure proposée) ajoute « Heure fixe » et « Événement ».
+   */
+  | { kind: 'goalPick'; period: GoalPeriod; periodStart: ISODate; at?: Date }
   | { kind: 'window'; id?: ID }
   /** Choix « Tâche ou événement ? » depuis le bouton + du calendrier. */
   | { kind: 'add'; date?: Date }

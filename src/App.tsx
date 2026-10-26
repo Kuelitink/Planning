@@ -57,7 +57,7 @@ function CurrentSheet() {
     case 'project':
       return <ProjectSheet key={sheet.id ?? 'new'} id={sheet.id} onClose={closeSheet} />;
     case 'goalPick':
-      return <GoalPickSheet period={sheet.period} periodStart={sheet.periodStart} onClose={closeSheet} />;
+      return <GoalPickSheet period={sheet.period} periodStart={sheet.periodStart} at={sheet.at} onClose={closeSheet} />;
     case 'window':
       return <WindowSheet key={sheet.id ?? 'new'} id={sheet.id} onClose={closeSheet} />;
     case 'cycleDay':

@@ -805,16 +805,19 @@ button {
   }
 }
 
-/* Fiche tâche : créneau fixé à la main (déplacé dans le planning). */
-.pinned-slot {
-  margin-top: 12px;
-  padding: 8px 8px 8px 14px;
-  border: 1.5px dashed var(--ink);
-  border-radius: 14px;
-  display: flex;
+/* Fiche tâche : « de … à … » d'une heure fixe. */
+.time-range {
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
-  font-size: 14px;
   font-weight: 700;
+  color: var(--muted);
+}
+
+/* Feuille « Ajouter au planning » : raccourcis heure fixe / événement. */
+.pick-shortcuts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 4px;
 }

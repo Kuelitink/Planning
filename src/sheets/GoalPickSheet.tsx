@@ -2,19 +2,24 @@
  * Choisir les tâches de la checklist d'une période : les plus urgentes d'abord, ou par
  * recherche (titre ou liste, sans tenir compte des accents). Toucher une tâche
  * l'ajoute ou la retire tout de suite ; un titre introuvable peut être créé.
+ * Depuis le Calendrier (bouton +), c'est la checklist du jour affiché, avec en plus
+ * « Tâche à heure fixe » et « Événement ».
  */
 
 import { useId, useMemo, useState } from 'react';
 import type { GoalPeriod, ISODate, Task } from '../core/types';
 import { parseDeadline } from '../core/scheduler';
-import { DAY } from '../core/time';
+import { DAY, MINUTE } from '../core/time';
 import { useStore } from '../state/store';
+import { useNav } from '../state/nav';
 import { byUrgency, fold, isLate, matchesQuery, pickedTaskIds } from '../state/urgency';
 import { Dot, Sheet } from '../ui/kit';
-import { IconCheck, IconFlag, IconPlus } from '../ui/icons';
+import { IconCalendar, IconCheck, IconClock, IconFlag, IconPlus } from '../ui/icons';
 import { PRIORITY_COLOR } from '../ui/palette';
 import { plannedLabel, shortDeadline, usePlanIndex, type PlanIndex } from '../modes/TaskRow';
 import { periodLabel } from '../modes/ChecklistMode';
+
+const HOUR = 60 * MINUTE;
 
 /** Une échéance à moins de 3 jours s'affiche à la place du créneau prévu. */
 const SOON_MS = 3 * DAY;
@@ -56,8 +61,20 @@ const rowStyle = (on: boolean) =>
     textAlign: 'left',
   }) as const;
 
-export function GoalPickSheet({ period, periodStart, onClose }: { period: GoalPeriod; periodStart: ISODate; onClose: () => void }) {
+export function GoalPickSheet({
+  period,
+  periodStart,
+  at,
+  onClose,
+}: {
+  period: GoalPeriod;
+  periodStart: ISODate;
+  /** Ouvert depuis le Calendrier : heure proposée pour une tâche à heure fixe ou un événement. */
+  at?: Date;
+  onClose: () => void;
+}) {
   const { tasks, projects, goals, plan, addTask, pickTask, unpickTask } = useStore();
+  const { openSheet } = useNav();
   const index = usePlanIndex();
   const searchId = useId();
   const [query, setQuery] = useState('');
@@ -82,10 +99,32 @@ export function GoalPickSheet({ period, periodStart, onClose }: { period: GoalPe
   };
 
   return (
-    <Sheet title="Ajouter à la checklist" onClose={onClose}>
+    <Sheet title={at ? 'Ajouter au planning' : 'Ajouter à la checklist'} onClose={onClose}>
       <p className="subtitle" style={{ margin: '-4px 0 12px' }}>
         {periodLabel(period, periodStart, now)}
       </p>
+
+      {at && (
+        <div className="pick-shortcuts">
+          <button
+            type="button"
+            className="pill pill--sm"
+            onClick={() =>
+              openSheet({
+                kind: 'task',
+                defaults: { durationMin: 60, pinned: { start: at.toISOString(), end: new Date(at.getTime() + HOUR).toISOString() } },
+              })
+            }
+          >
+            <IconClock size={16} />
+            <span>Tâche à heure fixe</span>
+          </button>
+          <button type="button" className="pill pill--sm" onClick={() => openSheet({ kind: 'event', date: at })}>
+            <IconCalendar size={16} />
+            <span>Événement</span>
+          </button>
+        </div>
+      )}
 
       <div style={{ position: 'sticky', top: -8, zIndex: 1, background: 'var(--card)', padding: '8px 0 12px' }}>
         <label htmlFor={searchId} className="sr-only">

@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import type { ID, Priority, Task } from '../core/types';
-import { formatDuration, formatHM, isDateOnly, parseDateTime } from '../core/time';
+import { DAY, MINUTE, formatDuration, formatHM, isDateOnly, parseDateTime } from '../core/time';
 import { useStore } from '../state/store';
 import { useNav } from '../state/nav';
 import { DurationSelect, Field, PriorityPicker, Sheet } from '../ui/kit';
@@ -117,6 +117,13 @@ function OptionalDate({
   );
 }
 
+/** Début proposé pour une heure fixe : la prochaine heure ronde. */
+function nextHour(): Date {
+  const d = new Date();
+  d.setHours(d.getHours() + 1, 0, 0, 0);
+  return d;
+}
+
 /** Échéance stockée → champs date / heure du formulaire. */
 function splitDeadline(value?: string): { date: string; time: string } {
   if (!value) return { date: '', time: '' };
@@ -154,6 +161,13 @@ export function TaskSheet({ id, defaults, onClose }: { id?: ID; defaults?: Parti
   const [splittable, setSplittable] = useState(base.splittable ?? NEW_SPLITTABLE);
   const [minChunkMin, setMinChunkMin] = useState(base.minChunkMin ?? NEW_MIN_CHUNK_MIN);
   const [notes, setNotes] = useState(base.notes ?? '');
+  // Heure fixe (« de … à … ») : la tâche est posée sur ce créneau, l'auto-planification ne la déplace pas.
+  const pinStart = base.pinned ? parseDateTime(base.pinned.start) : nextHour();
+  const pinEnd = base.pinned ? parseDateTime(base.pinned.end) : new Date(pinStart.getTime() + (base.durationMin ?? NEW_DURATION_MIN) * MINUTE);
+  const [fixed, setFixed] = useState(Boolean(base.pinned));
+  const [fixDate, setFixDate] = useState(toInputDate(pinStart));
+  const [fixFrom, setFixFrom] = useState(toInputTime(pinStart));
+  const [fixTo, setFixTo] = useState(toInputTime(pinEnd));
 
   const ids = {
     title: useId(),
@@ -166,6 +180,9 @@ export function TaskSheet({ id, defaults, onClose }: { id?: ID; defaults?: Parti
     split: useId(),
     chunk: useId(),
     notes: useId(),
+    fixed: useId(),
+    fixDate: useId(),
+    fixFrom: useId(),
   };
 
   const byId = useMemo(() => new Map(tasks.map((t) => [t.id, t])), [tasks]);
@@ -206,13 +223,24 @@ export function TaskSheet({ id, defaults, onClose }: { id?: ID; defaults?: Parti
     if (spentMin >= 1) info.push(`${formatDuration(spentMin)} chronométrées`);
   }
 
+  /** Créneau de l'heure fixe ; une fin avant le début passe au lendemain. */
+  const fixedRange = () => {
+    const start = fromInputs(fixDate, fixFrom);
+    let end = fromInputs(fixDate, fixTo);
+    if (end <= start) end = new Date(end.getTime() + DAY);
+    return { start, end };
+  };
+  const fixedValid = !fixed || Boolean(fixDate && fixFrom && fixTo);
+
   const save = () => {
     const clean = title.trim();
-    if (!clean) return;
+    if (!clean || !fixedValid) return;
+    const range = fixed ? fixedRange() : undefined;
     const fields = {
       title: clean,
       projectId: projectId || undefined,
-      durationMin,
+      durationMin: range ? Math.max(5, Math.round((range.end.getTime() - range.start.getTime()) / MINUTE)) : durationMin,
+      pinned: range ? { start: range.start.toISOString(), end: range.end.toISOString() } : undefined,
       priority,
       deadline: deadlineDate ? (deadlineTime ? fromInputs(deadlineDate, deadlineTime).toISOString() : deadlineDate) : undefined,
       windowId: windowId || undefined,
@@ -271,106 +299,136 @@ export function TaskSheet({ id, defaults, onClose }: { id?: ID; defaults?: Parti
             </select>
           </Field>
 
-          <Field label="Durée" htmlFor={ids.duration}>
-            <DurationSelect id={ids.duration} value={durationMin} onChange={setDurationMin} />
+          <Field label="Heure fixe" htmlFor={ids.fixed}>
+            <input
+              id={ids.fixed}
+              type="checkbox"
+              role="switch"
+              className="switch"
+              checked={fixed}
+              onChange={(e) => setFixed(e.target.checked)}
+            />
           </Field>
+
+          {fixed ? (
+            <>
+              <Field label="Le" htmlFor={ids.fixDate}>
+                <input id={ids.fixDate} type="date" value={fixDate} onChange={(e) => setFixDate(e.target.value)} />
+              </Field>
+              <Field label="De" htmlFor={ids.fixFrom}>
+                <span className="time-range">
+                  <input id={ids.fixFrom} type="time" value={fixFrom} onChange={(e) => setFixFrom(e.target.value)} />
+                  <span>à</span>
+                  <input type="time" aria-label="Heure de fin" value={fixTo} onChange={(e) => setFixTo(e.target.value)} />
+                </span>
+              </Field>
+            </>
+          ) : (
+            <Field label="Durée" htmlFor={ids.duration}>
+              <DurationSelect id={ids.duration} value={durationMin} onChange={setDurationMin} />
+            </Field>
+          )}
 
           <Field label="Priorité">
             <PriorityPicker value={priority} onChange={setPriority} />
           </Field>
 
-          {/* Sans échéance (par défaut), le planificateur en déduit une de la priorité et
-              replace la tâche à chaque recalcul tant qu'elle n'est pas cochée. */}
-          <Field label="Échéance" htmlFor={ids.deadline}>
-            <OptionalDate
-              id={ids.deadline}
-              label="Échéance"
-              value={deadlineDate}
-              onChange={(d) => {
-                setDeadlineDate(d);
-                if (!d) setDeadlineTime('');
-              }}
-              clearLabel="Effacer l'échéance"
-            >
-              <input
-                type="time"
-                aria-label="Heure de l'échéance (facultatif)"
-                value={deadlineTime}
-                onChange={(e) => setDeadlineTime(e.target.value)}
-              />
-            </OptionalDate>
-          </Field>
-
-          <Field label="Horaires" htmlFor={ids.window}>
-            <select id={ids.window} value={windowId} onChange={(e) => setWindowId(e.target.value)}>
-              <option value="">Par défaut ({defaultWindowName})</option>
-              {windows.map((w) => (
-                <option key={w.id} value={w.id}>
-                  {w.name}
-                </option>
-              ))}
-            </select>
-          </Field>
-
-          <Field label="Pas avant" htmlFor={ids.earliest}>
-            <OptionalDate id={ids.earliest} label="Pas avant" value={earliest} onChange={setEarliest} clearLabel="Effacer la date de début" />
-          </Field>
-
-          <Field label="Après" htmlFor={ids.deps}>
-            {dependsOn
-              .map((d) => byId.get(d))
-              .filter((t): t is Task => Boolean(t))
-              .map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  className="chip"
-                  aria-label={`Retirer « ${t.title} »`}
-                  onClick={() => setDependsOn(dependsOn.filter((x) => x !== t.id))}
-                  style={{ maxWidth: 200 }}
+          {!fixed && (
+            <>
+              {/* Sans échéance (par défaut), le planificateur en déduit une de la priorité et
+                  replace la tâche à chaque recalcul tant qu'elle n'est pas cochée. */}
+              <Field label="Échéance" htmlFor={ids.deadline}>
+                <OptionalDate
+                  id={ids.deadline}
+                  label="Échéance"
+                  value={deadlineDate}
+                  onChange={(d) => {
+                    setDeadlineDate(d);
+                    if (!d) setDeadlineTime('');
+                  }}
+                  clearLabel="Effacer l'échéance"
                 >
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title}</span>
-                  <IconX size={14} />
-                </button>
-              ))}
-            {candidates.length > 0 && (
-              <select
-                id={ids.deps}
-                value=""
-                onChange={(e) => e.target.value && setDependsOn([...dependsOn, e.target.value])}
-                style={{ maxWidth: 180 }}
-              >
-                <option value="">{dependsOn.length ? 'Ajouter…' : 'Aucune'}</option>
-                {candidates.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.title}
-                  </option>
-                ))}
-              </select>
-            )}
-          </Field>
+                  <input
+                    type="time"
+                    aria-label="Heure de l'échéance (facultatif)"
+                    value={deadlineTime}
+                    onChange={(e) => setDeadlineTime(e.target.value)}
+                  />
+                </OptionalDate>
+              </Field>
 
-          <Field label="Découpable" htmlFor={ids.split}>
-            <input
-              id={ids.split}
-              type="checkbox"
-              role="switch"
-              className="switch"
-              checked={splittable}
-              onChange={(e) => setSplittable(e.target.checked)}
-            />
-          </Field>
+              <Field label="Horaires" htmlFor={ids.window}>
+                <select id={ids.window} value={windowId} onChange={(e) => setWindowId(e.target.value)}>
+                  <option value="">Par défaut ({defaultWindowName})</option>
+                  {windows.map((w) => (
+                    <option key={w.id} value={w.id}>
+                      {w.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
 
-          {splittable && (
-            <Field label="Morceaux d'au moins" htmlFor={ids.chunk}>
-              <select id={ids.chunk} value={minChunkMin} onChange={(e) => setMinChunkMin(Number(e.target.value))}>
-                {(CHUNKS.includes(minChunkMin) ? CHUNKS : [...CHUNKS, minChunkMin].sort((a, b) => a - b)).map((m) => (
-                  <option key={m} value={m}>
-                    {formatDuration(m)}
-                  </option>
-                ))}
-              </select>
-            </Field>
+              <Field label="Pas avant" htmlFor={ids.earliest}>
+                <OptionalDate id={ids.earliest} label="Pas avant" value={earliest} onChange={setEarliest} clearLabel="Effacer la date de début" />
+              </Field>
+
+              <Field label="Après" htmlFor={ids.deps}>
+                {dependsOn
+                  .map((d) => byId.get(d))
+                  .filter((t): t is Task => Boolean(t))
+                  .map((t) => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      className="chip"
+                      aria-label={`Retirer « ${t.title} »`}
+                      onClick={() => setDependsOn(dependsOn.filter((x) => x !== t.id))}
+                      style={{ maxWidth: 200 }}
+                    >
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title}</span>
+                      <IconX size={14} />
+                    </button>
+                  ))}
+                {candidates.length > 0 && (
+                  <select
+                    id={ids.deps}
+                    value=""
+                    onChange={(e) => e.target.value && setDependsOn([...dependsOn, e.target.value])}
+                    style={{ maxWidth: 180 }}
+                  >
+                    <option value="">{dependsOn.length ? 'Ajouter…' : 'Aucune'}</option>
+                    {candidates.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.title}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </Field>
+
+              <Field label="Découpable" htmlFor={ids.split}>
+                <input
+                  id={ids.split}
+                  type="checkbox"
+                  role="switch"
+                  className="switch"
+                  checked={splittable}
+                  onChange={(e) => setSplittable(e.target.checked)}
+                />
+              </Field>
+
+              {splittable && (
+                <Field label="Morceaux d'au moins" htmlFor={ids.chunk}>
+                  <select id={ids.chunk} value={minChunkMin} onChange={(e) => setMinChunkMin(Number(e.target.value))}>
+                    {(CHUNKS.includes(minChunkMin) ? CHUNKS : [...CHUNKS, minChunkMin].sort((a, b) => a - b)).map((m) => (
+                      <option key={m} value={m}>
+                        {formatDuration(m)}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              )}
+            </>
           )}
         </div>
 
@@ -401,31 +459,8 @@ export function TaskSheet({ id, defaults, onClose }: { id?: ID; defaults?: Parti
           </p>
         )}
 
-        {task?.pinned && task.status === 'todo' && (
-          <div className="pinned-slot">
-            <span>
-              Créneau fixé : {formatRelativeDay(parseDateTime(task.pinned.start)).toLowerCase()}{' '}
-              {formatHM(parseDateTime(task.pinned.start))}–{formatHM(parseDateTime(task.pinned.end))}
-            </span>
-            <button
-              type="button"
-              className="pill pill--sm"
-              onClick={() => {
-                const before = task.pinned;
-                store.saveTask({ ...task, pinned: undefined });
-                showToast({
-                  message: 'Créneau libéré : la tâche est auto-planifiée',
-                  action: { label: 'Annuler', run: () => store.saveTask({ ...task, pinned: before }) },
-                });
-              }}
-            >
-              Libérer
-            </button>
-          </div>
-        )}
-
         <div className="sheet__actions">
-          <button type="submit" className="btn btn--primary btn--block" disabled={!title.trim()} style={title.trim() ? undefined : { opacity: 0.5 }}>
+          <button type="submit" className="btn btn--primary btn--block" disabled={!title.trim() || !fixedValid} style={title.trim() && fixedValid ? undefined : { opacity: 0.5 }}>
             Enregistrer
           </button>
           {task && (
