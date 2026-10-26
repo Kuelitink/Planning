@@ -37,8 +37,10 @@ dépendances, horaires, découpage) sont dans sa fiche : on l'ouvre en touchant 
   le temps de la session à la tâche.
 - **Sous-tâches** : planifiées chacune à la place de leur tâche mère, avec son échéance, sa
   priorité et sa place ; cocher la dernière coche la mère.
-- **Hiérarchie des listes** : à priorité égale, la liste du dessus passe avant celle du dessous
-  (une haute d'une liste du dessous passe quand même avant une normale du dessus).
+- **Hiérarchie des listes** : les listes se réordonnent par appui long dans le mode Listes. À
+  priorité égale, la liste du dessus passe avant celle du dessous : toutes les ASAP d'abord,
+  de la liste du haut à celle du bas, puis les hautes, etc. (une haute d'une liste du dessous
+  passe donc avant une normale du dessus).
 
 **Auto-planification** : les tâches à faire sont placées au plus tôt dans les créneaux libres,
 la plus urgente d'abord (échéance, priorité, dépendances), et replacées à chaque modification.

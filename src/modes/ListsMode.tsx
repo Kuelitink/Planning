@@ -2,6 +2,10 @@
  * Mode Listes : les listes / projets, puis les tâches d'une liste, dans leur ordre (en haut =
  * la plus urgente, à priorité égale) : appui long + glisser pour réordonner, glisser à droite
  * pour une sous-tâche, comme dans la Checklist.
+ *
+ * Les listes elles-mêmes se réordonnent par appui long. Leur ordre départage le planificateur
+ * à priorité égale : les ASAP de la liste du dessus passent avant celles de la liste du
+ * dessous, mais une priorité haute d'une liste du dessous passe avant une normale du dessus.
  */
 
 import { useEffect, useId, useMemo, useState, type FormEvent } from 'react';
@@ -15,6 +19,8 @@ import { IconChevronLeft, IconChevronRight, IconPlus } from '../ui/icons';
 import { checklistRows, listChanges, listTopIds, type ChecklistRow } from '../core/checklist';
 import { Collapsible, LIST_STYLE, TaskRow } from './TaskRow';
 import { INDENT_PX, SortableTaskList } from './SortableTasks';
+import { ReorderList } from '../ui/ReorderList';
+import './checklist.css';
 
 /** Identifiant de la pseudo-liste des tâches sans liste. */
 export const NO_LIST = '__none__';
@@ -25,7 +31,7 @@ export function ListsMode() {
 }
 
 function ListOverview() {
-  const { projects, tasks } = useStore();
+  const { projects, tasks, saveProject } = useStore();
   const { openSheet, setOpenListId } = useNav();
 
   const lists = useMemo(() => projects.filter((p) => !p.archived).sort((a, b) => a.order - b.order), [projects]);
@@ -34,10 +40,25 @@ function ListOverview() {
     tasks.filter((t) => t.status === 'todo' && (id === NO_LIST ? !t.projectId || !known.has(t.projectId) : t.projectId === id)).length;
   const hasOrphans = tasks.some((t) => !t.projectId || !known.has(t.projectId));
 
-  const rows = [
-    ...lists.map((p) => ({ id: p.id, name: p.name, color: p.color })),
-    ...(hasOrphans ? [{ id: NO_LIST, name: 'Sans liste', color: NEUTRAL_TONE.dot }] : []),
-  ];
+  /** Nouvel ordre des listes : seules celles qui changent de rang sont enregistrées. */
+  const reorder = (ids: ID[]) => {
+    ids.forEach((id, i) => {
+      const p = lists.find((x) => x.id === id);
+      if (p && p.order !== i) saveProject({ ...p, order: i });
+    });
+  };
+
+  const row = (r: { id: ID; name: string; color: string }, onClick: () => void) => {
+    const count = todoCount(r.id);
+    return (
+      <button type="button" className="row" style={{ width: '100%', textAlign: 'left' }} onClick={onClick} aria-label={`${r.name}, ${count} à faire`}>
+        <Dot color={r.color} large />
+        <span className="row__title">{r.name}</span>
+        <span className="row__meta">{count}</span>
+        <IconChevronRight size={18} />
+      </button>
+    );
+  };
 
   return (
     <>
@@ -49,28 +70,25 @@ function ListOverview() {
         </button>
       </div>
 
-      {rows.length ? (
-        <ul className="stack" style={{ ...LIST_STYLE, marginTop: 20 }}>
-          {rows.map((r) => {
-            const count = todoCount(r.id);
-            return (
-              <li key={r.id}>
-                <button
-                  type="button"
-                  className="row"
-                  style={{ width: '100%', textAlign: 'left' }}
-                  onClick={() => setOpenListId(r.id)}
-                  aria-label={`${r.name}, ${count} à faire`}
-                >
-                  <Dot color={r.color} large />
-                  <span className="row__title">{r.name}</span>
-                  <span className="row__meta">{count}</span>
-                  <IconChevronRight size={18} />
-                </button>
-              </li>
-            );
-          })}
-        </ul>
+      {lists.length || hasOrphans ? (
+        <>
+          <ReorderList
+            items={lists}
+            onReorder={reorder}
+            style={{ ...LIST_STYLE, marginTop: 20 }}
+            render={(p, guard) => row(p, guard(() => setOpenListId(p.id)))}
+          />
+          {hasOrphans && (
+            <ul className="stack" style={{ ...LIST_STYLE, marginTop: 8 }}>
+              <li>{row({ id: NO_LIST, name: 'Sans liste', color: NEUTRAL_TONE.dot }, () => setOpenListId(NO_LIST))}</li>
+            </ul>
+          )}
+          {lists.length > 1 && (
+            <p className="cl-tip">
+              Appui long pour ordonner. À priorité égale, les tâches d'une liste passent avant celles des listes du dessous.
+            </p>
+          )}
+        </>
       ) : (
         <p className="empty">Aucune liste. Crée-en une avec +</p>
       )}
