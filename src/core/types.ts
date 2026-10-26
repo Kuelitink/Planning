@@ -99,8 +99,30 @@ export interface Task extends Entity {
    * n'est pas planifiée elle-même : ses sous-tâches le sont, avec son échéance et sa priorité.
    */
   parentId?: ID;
-  /** Rang parmi les sous-tâches de la même tâche (plus petit = plus haut). */
+  /** Rang parmi les sous-tâches de la même tâche, ou dans sa liste (plus petit = plus haut). */
   order?: number;
+  /** Tâche qui revient (voir core/recurrence.ts). */
+  recurrence?: TaskRecurrence;
+  /** Tâche récurrente : jour de l'occurrence en cours (planifiée ce jour-là). */
+  occurrence?: ISODate;
+  /** Tâche récurrente : occurrence cochée en dernier (pour « Annuler »). */
+  prevOccurrence?: ISODate;
+  /** Marge laissée libre avant la tâche, en minutes (trajet, préparation…). */
+  bufferBeforeMin?: number;
+  /** Marge laissée libre après la tâche, en minutes. */
+  bufferAfterMin?: number;
+}
+
+/** Répétition d'une tâche : tous les `interval` jours, semaines (certains jours) ou mois. */
+export interface TaskRecurrence {
+  freq: 'daily' | 'weekly' | 'monthly';
+  interval: number;
+  /** Récurrence hebdomadaire : jours concernés (vide = le jour de `start`). */
+  weekdays?: Weekday[];
+  /** Première occurrence ; sert de point de départ au rythme (une semaine sur deux…). */
+  start: ISODate;
+  /** Dernière occurrence possible (incluse). */
+  until?: ISODate;
 }
 
 export interface Recurrence {

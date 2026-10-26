@@ -1,12 +1,13 @@
 /** Fiche tâche : création ou édition. Tous les détails d'une tâche vivent ici. */
 
 import { useEffect, useId, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import type { ID, Priority, Task } from '../core/types';
-import { DAY, MINUTE, formatDuration, formatHM, isDateOnly, parseDateTime } from '../core/time';
+import type { ID, Priority, Task, TaskRecurrence, Weekday } from '../core/types';
+import { DAY, MINUTE, formatDuration, formatHM, isDateOnly, parseDateTime, parseISODate } from '../core/time';
+import { describeRecurrence, occurrenceFrom } from '../core/recurrence';
 import { useStore } from '../state/store';
 import { useNav } from '../state/nav';
 import { DurationSelect, Field, PriorityPicker, Sheet } from '../ui/kit';
-import { formatRelativeDay, fromInputs, toInputDate, toInputTime } from '../ui/format';
+import { WEEK_DAYS, formatRelativeDay, fromInputs, toInputDate, toInputTime } from '../ui/format';
 import { IconX } from '../ui/icons';
 import { REASON_LABEL } from '../modes/TaskRow';
 
@@ -117,6 +118,17 @@ function OptionalDate({
   );
 }
 
+/** Marges proposées avant / après une tâche, en minutes. */
+const MARGINS = [0, 5, 10, 15, 20, 30, 45, 60, 90];
+
+type Repeat = 'none' | TaskRecurrence['freq'];
+
+const REPEAT_UNIT: Record<TaskRecurrence['freq'], [string, string]> = {
+  daily: ['jour', 'jours'],
+  weekly: ['semaine', 'semaines'],
+  monthly: ['mois', 'mois'],
+};
+
 /** Début proposé pour une heure fixe : la prochaine heure ronde. */
 function nextHour(): Date {
   const d = new Date();
@@ -168,6 +180,16 @@ export function TaskSheet({ id, defaults, onClose }: { id?: ID; defaults?: Parti
   const [fixDate, setFixDate] = useState(toInputDate(pinStart));
   const [fixFrom, setFixFrom] = useState(toInputTime(pinStart));
   const [fixTo, setFixTo] = useState(toInputTime(pinEnd));
+  // Répétition (tâche récurrente) : rythme, jours, prochaine occurrence, fin.
+  const rec = base.recurrence;
+  const [repeat, setRepeat] = useState<Repeat>(rec?.freq ?? 'none');
+  const [every, setEvery] = useState(rec?.interval ?? 1);
+  const [repeatDays, setRepeatDays] = useState<Weekday[]>(rec?.weekdays ?? []);
+  const [nextDate, setNextDate] = useState(base.occurrence ?? toInputDate(new Date()));
+  const [until, setUntil] = useState(rec?.until ?? '');
+  // Marges libres avant / après la tâche.
+  const [bufferBefore, setBufferBefore] = useState(base.bufferBeforeMin ?? 0);
+  const [bufferAfter, setBufferAfter] = useState(base.bufferAfterMin ?? 0);
 
   const ids = {
     title: useId(),
@@ -183,6 +205,11 @@ export function TaskSheet({ id, defaults, onClose }: { id?: ID; defaults?: Parti
     fixed: useId(),
     fixDate: useId(),
     fixFrom: useId(),
+    repeat: useId(),
+    every: useId(),
+    next: useId(),
+    until: useId(),
+    before: useId(),
   };
 
   const byId = useMemo(() => new Map(tasks.map((t) => [t.id, t])), [tasks]);
@@ -218,6 +245,9 @@ export function TaskSheet({ id, defaults, onClose }: { id?: ID; defaults?: Parti
       info.push(reason === 'no-slot' ? 'Pas de créneau trouvé' : REASON_LABEL[reason]);
     }
   }
+  if (task?.recurrence && task.occurrence && task.status === 'todo') {
+    info.unshift(`↻ ${describeRecurrence(task.recurrence)} · prochaine : ${formatRelativeDay(parseISODate(task.occurrence)).toLowerCase()}`);
+  }
   if (task) {
     const spentMin = Math.floor(store.timeSpent(task.id) / 60_000);
     if (spentMin >= 1) info.push(`${formatDuration(spentMin)} chronométrées`);
@@ -232,19 +262,43 @@ export function TaskSheet({ id, defaults, onClose }: { id?: ID; defaults?: Parti
   };
   const fixedValid = !fixed || Boolean(fixDate && fixFrom && fixTo);
 
+  /** Répétition choisie ; son occurrence en cours est le premier jour de la série à partir de la date choisie. */
+  const recurrenceOf = (): { recurrence: TaskRecurrence; occurrence: string } | undefined => {
+    if (repeat === 'none') return undefined;
+    const from = (fixed ? fixDate : nextDate) || toInputDate(new Date());
+    const weekdays = repeat === 'weekly' ? (repeatDays.length ? repeatDays : [parseISODate(from).getDay() as Weekday]) : undefined;
+    // Le rythme (une semaine sur deux…) part de la série existante si elle ne change pas de nature.
+    const start = rec && rec.freq === repeat && rec.interval === every && rec.start <= from ? rec.start : from;
+    const recurrence: TaskRecurrence = { freq: repeat, interval: Math.max(1, every), weekdays, start, until: until || undefined };
+    return { recurrence, occurrence: occurrenceFrom(recurrence, from) ?? from };
+  };
+
   const save = () => {
     const clean = title.trim();
     if (!clean || !fixedValid) return;
-    const range = fixed ? fixedRange() : undefined;
+    const repeating = recurrenceOf();
+    let range = fixed ? fixedRange() : undefined;
+    // Heure fixe d'une tâche récurrente : le créneau suit le jour de l'occurrence.
+    if (range && repeating && repeating.occurrence !== fixDate) {
+      const shift = parseISODate(repeating.occurrence).getTime() - parseISODate(fixDate).getTime();
+      const days = Math.round(shift / DAY);
+      range = { start: new Date(range.start.getTime() + days * DAY), end: new Date(range.end.getTime() + days * DAY) };
+    }
     const fields = {
+      recurrence: repeating?.recurrence,
+      occurrence: repeating?.occurrence,
+      prevOccurrence: repeating && task?.occurrence === repeating.occurrence ? task.prevOccurrence : undefined,
+      bufferBeforeMin: bufferBefore || undefined,
+      bufferAfterMin: bufferAfter || undefined,
       title: clean,
       projectId: projectId || undefined,
       durationMin: range ? Math.max(5, Math.round((range.end.getTime() - range.start.getTime()) / MINUTE)) : durationMin,
       pinned: range ? { start: range.start.toISOString(), end: range.end.toISOString() } : undefined,
       priority,
-      deadline: deadlineDate ? (deadlineTime ? fromInputs(deadlineDate, deadlineTime).toISOString() : deadlineDate) : undefined,
+      // Une tâche récurrente est due le jour de son occurrence : pas d'échéance ni de « pas avant » à part.
+      deadline: repeating || !deadlineDate ? undefined : deadlineTime ? fromInputs(deadlineDate, deadlineTime).toISOString() : deadlineDate,
       windowId: windowId || undefined,
-      earliestStart: earliest || undefined,
+      earliestStart: repeating ? undefined : earliest || undefined,
       dependsOn: dependsOn.filter((d) => byId.has(d)),
       splittable,
       minChunkMin,
@@ -333,29 +387,109 @@ export function TaskSheet({ id, defaults, onClose }: { id?: ID; defaults?: Parti
             <PriorityPicker value={priority} onChange={setPriority} />
           </Field>
 
+          <Field label="Répéter" htmlFor={ids.repeat}>
+            <select id={ids.repeat} value={repeat} onChange={(e) => setRepeat(e.target.value as Repeat)}>
+              <option value="none">Jamais</option>
+              <option value="daily">Tous les jours</option>
+              <option value="weekly">Toutes les semaines</option>
+              <option value="monthly">Tous les mois</option>
+            </select>
+          </Field>
+
+          {repeat !== 'none' && (
+            <>
+              <Field label="Tous les" htmlFor={ids.every}>
+                <span className="time-range">
+                  <input
+                    id={ids.every}
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    max={99}
+                    value={every}
+                    onChange={(e) => setEvery(Math.max(1, Math.min(99, Number(e.target.value) || 1)))}
+                    style={{ width: 64 }}
+                  />
+                  <span>{REPEAT_UNIT[repeat][every > 1 ? 1 : 0]}</span>
+                </span>
+              </Field>
+              {repeat === 'weekly' && (
+                <Field label="Le">
+                  <div className="day-chips" role="group" aria-label="Jours de répétition">
+                    {WEEK_DAYS.map((d) => (
+                      <button
+                        key={d.weekday}
+                        type="button"
+                        className="chip"
+                        aria-pressed={repeatDays.includes(d.weekday)}
+                        aria-label={d.name}
+                        onClick={() =>
+                          setRepeatDays((cur) => (cur.includes(d.weekday) ? cur.filter((x) => x !== d.weekday) : [...cur, d.weekday]))
+                        }
+                      >
+                        {d.short}
+                      </button>
+                    ))}
+                  </div>
+                </Field>
+              )}
+              {!fixed && (
+                <Field label="Prochaine fois" htmlFor={ids.next}>
+                  <input id={ids.next} type="date" value={nextDate} onChange={(e) => setNextDate(e.target.value)} />
+                </Field>
+              )}
+              <Field label="Jusqu'au" htmlFor={ids.until}>
+                <OptionalDate id={ids.until} label="Jusqu'au" value={until} onChange={setUntil} clearLabel="Répéter sans fin" />
+              </Field>
+            </>
+          )}
+
+          <Field label="Marges" htmlFor={ids.before}>
+            <span className="time-range">
+              <span>avant</span>
+              <select id={ids.before} value={bufferBefore} onChange={(e) => setBufferBefore(Number(e.target.value))} aria-label="Marge avant">
+                {MARGINS.map((m) => (
+                  <option key={m} value={m}>
+                    {m ? formatDuration(m) : '0'}
+                  </option>
+                ))}
+              </select>
+              <span>après</span>
+              <select value={bufferAfter} onChange={(e) => setBufferAfter(Number(e.target.value))} aria-label="Marge après">
+                {MARGINS.map((m) => (
+                  <option key={m} value={m}>
+                    {m ? formatDuration(m) : '0'}
+                  </option>
+                ))}
+              </select>
+            </span>
+          </Field>
+
           {!fixed && (
             <>
               {/* Sans échéance (par défaut), le planificateur en déduit une de la priorité et
                   replace la tâche à chaque recalcul tant qu'elle n'est pas cochée. */}
-              <Field label="Échéance" htmlFor={ids.deadline}>
-                <OptionalDate
-                  id={ids.deadline}
-                  label="Échéance"
-                  value={deadlineDate}
-                  onChange={(d) => {
-                    setDeadlineDate(d);
-                    if (!d) setDeadlineTime('');
-                  }}
-                  clearLabel="Effacer l'échéance"
-                >
-                  <input
-                    type="time"
-                    aria-label="Heure de l'échéance (facultatif)"
-                    value={deadlineTime}
-                    onChange={(e) => setDeadlineTime(e.target.value)}
-                  />
-                </OptionalDate>
-              </Field>
+              {repeat === 'none' && (
+                <Field label="Échéance" htmlFor={ids.deadline}>
+                  <OptionalDate
+                    id={ids.deadline}
+                    label="Échéance"
+                    value={deadlineDate}
+                    onChange={(d) => {
+                      setDeadlineDate(d);
+                      if (!d) setDeadlineTime('');
+                    }}
+                    clearLabel="Effacer l'échéance"
+                  >
+                    <input
+                      type="time"
+                      aria-label="Heure de l'échéance (facultatif)"
+                      value={deadlineTime}
+                      onChange={(e) => setDeadlineTime(e.target.value)}
+                    />
+                  </OptionalDate>
+                </Field>
+              )}
 
               <Field label="Horaires" htmlFor={ids.window}>
                 <select id={ids.window} value={windowId} onChange={(e) => setWindowId(e.target.value)}>
@@ -368,9 +502,11 @@ export function TaskSheet({ id, defaults, onClose }: { id?: ID; defaults?: Parti
                 </select>
               </Field>
 
-              <Field label="Pas avant" htmlFor={ids.earliest}>
-                <OptionalDate id={ids.earliest} label="Pas avant" value={earliest} onChange={setEarliest} clearLabel="Effacer la date de début" />
-              </Field>
+              {repeat === 'none' && (
+                <Field label="Pas avant" htmlFor={ids.earliest}>
+                  <OptionalDate id={ids.earliest} label="Pas avant" value={earliest} onChange={setEarliest} clearLabel="Effacer la date de début" />
+                </Field>
+              )}
 
               <Field label="Après" htmlFor={ids.deps}>
                 {dependsOn

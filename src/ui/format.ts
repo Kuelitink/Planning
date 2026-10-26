@@ -1,5 +1,6 @@
 /** Formats de dates en français. */
 
+import type { Weekday } from '../core/types';
 import { addDays, isDateOnly, isSameDay, parseDateTime, startOfDay } from '../core/time';
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -66,3 +67,14 @@ export function fromInputs(date: string, time: string): Date {
   const [h, min] = time.split(':').map(Number);
   return new Date(y, m - 1, d, h || 0, min || 0);
 }
+
+/** Jours dans l'ordre français (lundi d'abord), pour les choix de répétition. */
+export const WEEK_DAYS: { weekday: Weekday; short: string; name: string }[] = [
+  { weekday: 1, short: 'L', name: 'Lundi' },
+  { weekday: 2, short: 'M', name: 'Mardi' },
+  { weekday: 3, short: 'M', name: 'Mercredi' },
+  { weekday: 4, short: 'J', name: 'Jeudi' },
+  { weekday: 5, short: 'V', name: 'Vendredi' },
+  { weekday: 6, short: 'S', name: 'Samedi' },
+  { weekday: 0, short: 'D', name: 'Dimanche' },
+];

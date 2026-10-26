@@ -38,6 +38,7 @@ import { cycleLoad } from '../core/cycleLoad';
 import { initialSeed, sampleData, type Sample } from './defaults';
 import { checklistPicks, goalsOf, PERIOD_PRIORITY } from './urgency';
 import { listTopIds, type ChecklistChanges } from '../core/checklist';
+import { advanceRecurring, revertRecurring } from '../core/recurrence';
 
 export interface AppData {
   projects: Project[];
@@ -154,11 +155,24 @@ function parentOf(task: Task, byId: Map<ID, Task>): Task | undefined {
 
 /** Échéance réelle : celle de la tâche, ou celle de sa tâche mère si elle est plus proche. */
 function realDeadline(task: Task, byId: Map<ID, Task>): number | undefined {
-  const own = task.deadline ? parseDeadline(task.deadline).getTime() : Infinity;
   const parent = parentOf(task, byId);
-  const inherited = parent?.deadline ? parseDeadline(parent.deadline).getTime() : Infinity;
-  const d = Math.min(own, inherited);
+  const d = Math.min(ownDeadline(task), parent ? ownDeadline(parent) : Infinity);
   return d === Infinity ? undefined : d;
+}
+
+/** Échéance d'une tâche : la sienne, ou la fin du jour de son occurrence si elle est récurrente. */
+function ownDeadline(task: Task): number {
+  const own = task.deadline ? parseDeadline(task.deadline).getTime() : Infinity;
+  const occurrence = task.recurrence && task.occurrence ? parseDeadline(task.occurrence).getTime() : Infinity;
+  return Math.min(own, occurrence);
+}
+
+/** Début au plus tôt : le sien, et pas avant le jour de son occurrence si elle est récurrente. */
+function earliestOf(task: Task): number | undefined {
+  const own = task.earliestStart ? parseDateTime(task.earliestStart).getTime() : -Infinity;
+  const occurrence = task.recurrence && task.occurrence ? parseDateTime(task.occurrence).getTime() : -Infinity;
+  const e = Math.max(own, occurrence);
+  return e === -Infinity ? undefined : e;
 }
 
 /** Tâches mères dont il reste des sous-tâches à faire : elles ne sont pas planifiées elles-mêmes. */
@@ -206,11 +220,16 @@ export function tasksForScheduling(data: AppData, now: Date): Task[] {
     const parent = parentOf(t, byId);
     const own = picks.get(t.id);
     const inherited = parent ? picks.get(parent.id) : undefined;
-    const pick = own && inherited ? (inherited.end < own.end ? inherited : own) : (own ?? inherited);
+    const earliest = earliestOf(t);
+    let pick = own && inherited ? (inherited.end < own.end ? inherited : own) : (own ?? inherited);
+    // Une tâche qui ne peut pas commencer dans la période (récurrente déjà faite pour aujourd'hui…)
+    // n'y est plus pressée.
+    if (pick && earliest !== undefined && earliest >= pick.end) pick = undefined;
+    if (earliest !== undefined && t.recurrence) task = { ...task, earliestStart: new Date(earliest).toISOString() };
     let deadline = realDeadline(t, byId);
     if (pick && (deadline === undefined || pick.end < deadline)) deadline = pick.end;
-    const ownDeadline = t.deadline ? parseDeadline(t.deadline).getTime() : undefined;
-    if (deadline !== undefined && deadline !== ownDeadline) task = { ...task, deadline: new Date(deadline).toISOString() };
+    const stored = t.deadline ? parseDeadline(t.deadline).getTime() : undefined;
+    if (deadline !== undefined && deadline !== stored) task = { ...task, deadline: new Date(deadline).toISOString() };
     const priority = Math.min(t.priority, parent?.priority ?? 4, pick ? PERIOD_PRIORITY[pick.period] : 4) as Priority;
     if (priority !== t.priority) task = { ...task, priority };
     if (parent && !t.projectId && parent.projectId) task = { ...task, projectId: parent.projectId };
@@ -465,6 +484,9 @@ export function StoreProvider({ children, repository }: { children: ReactNode; r
    * Cocher une tâche coche ses sous-tâches ; cocher la dernière sous-tâche coche la tâche
    * mère. Décocher défait ce qui avait été coché en même temps (même `doneAt`), et
    * décocher une sous-tâche remet sa mère à faire.
+   *
+   * Une tâche récurrente cochée passe à son occurrence suivante (ses sous-tâches repartent
+   * à zéro) ; décochée juste après, elle revient à l'occurrence précédente.
    */
   const setTaskDone = useCallback(
     (id: ID, done: boolean) => {
@@ -473,28 +495,52 @@ export function StoreProvider({ children, repository }: { children: ReactNode; r
       if (!task) return;
       const now = new Date();
       const iso = now.toISOString();
-      const changed: Task[] = [];
-      const set = (t: Task, isDone: boolean) => {
-        if ((t.status === 'done') === isDone) return;
-        changed.push(touch(t, { status: isDone ? 'done' : 'todo', doneAt: isDone ? iso : undefined }, now));
+      const today = toISODate(now);
+      const current = new Map(all.map((t) => [t.id, t]));
+      const changed = new Map<ID, Task>();
+      const put = (t: Task, changes: Partial<Task>) => {
+        const next = touch(current.get(t.id) ?? t, changes, now);
+        current.set(t.id, next);
+        changed.set(t.id, next);
+      };
+      /** Coche ou décoche ; « advanced » si une tâche récurrente est passée à l'occurrence suivante. */
+      const set = (t: Task, isDone: boolean): 'advanced' | undefined => {
+        const cur = current.get(t.id) ?? t;
+        if (cur.recurrence && cur.status === 'todo') {
+          if (isDone) {
+            const step = advanceRecurring(cur, today);
+            if (step) {
+              put(cur, step);
+              for (const c of all) {
+                if (c.parentId === cur.id && current.get(c.id)?.status === 'done') put(c, { status: 'todo', doneAt: undefined });
+              }
+              return 'advanced';
+            }
+          } else {
+            const back = revertRecurring(cur);
+            if (back) put(cur, back);
+            return undefined;
+          }
+        }
+        if ((cur.status === 'done') === isDone) return undefined;
+        put(cur, { status: isDone ? 'done' : 'todo', doneAt: isDone ? iso : undefined });
+        return undefined;
       };
       const children = all.filter((t) => t.parentId === id);
       const parent = task.parentId ? all.find((t) => t.id === task.parentId) : undefined;
       if (done) {
         stopRunningOn(id);
-        set(task, true);
-        children.forEach((c) => set(c, true));
+        if (set(task, true) !== 'advanced') children.forEach((c) => set(c, true));
         const siblings = parent ? all.filter((t) => t.parentId === parent.id && t.id !== id) : [];
-        if (parent && siblings.every((t) => t.status === 'done')) set(parent, true);
+        if (parent && siblings.every((t) => current.get(t.id)?.status === 'done')) set(parent, true);
       } else {
         set(task, false);
         children.filter((c) => c.doneAt && c.doneAt === task.doneAt).forEach((c) => set(c, false));
-        if (parent) set(parent, false);
+        if (parent && current.get(parent.id)?.status === 'done') set(parent, false);
       }
-      if (!changed.length) return;
-      const byId = new Map(changed.map((t) => [t.id, t]));
-      dataRef.current = { ...dataRef.current, tasks: dataRef.current.tasks.map((t) => byId.get(t.id) ?? t) };
-      setData((d) => ({ ...d, tasks: d.tasks.map((t) => byId.get(t.id) ?? t) }));
+      if (!changed.size) return;
+      dataRef.current = { ...dataRef.current, tasks: dataRef.current.tasks.map((t) => changed.get(t.id) ?? t) };
+      setData((d) => ({ ...d, tasks: d.tasks.map((t) => changed.get(t.id) ?? t) }));
       changed.forEach((t) => persist('tasks', t));
     },
     [persist, stopRunningOn],

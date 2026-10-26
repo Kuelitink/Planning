@@ -35,6 +35,11 @@ dépendances, horaires, découpage) sont dans sa fiche : on l'ouvre en touchant 
   statut, play/pause et « Terminer », puis « Changer de tâche » (les plus probables d'abord,
   et une recherche). Glisser vers la droite : le minuteur (5 à 60 min). Chaque arrêt ajoute
   le temps de la session à la tâche.
+- **Récurrence** (fiche tâche, « Répéter ») : tous les N jours, toutes les N semaines (jours au
+  choix) ou tous les N mois, avec « Prochaine fois » et « Jusqu'au ». La tâche est planifiée le
+  jour de son occurrence ; la cocher la fait passer à la suivante (↻), « Annuler » la ramène.
+- **Marges** (fiche tâche) : temps laissé libre avant et après la tâche (trajet, préparation),
+  en plus de la marge générale des réglages.
 - **Sous-tâches** : planifiées chacune à la place de leur tâche mère, avec son échéance, sa
   priorité et sa place ; cocher la dernière coche la mère.
 - **Hiérarchie des listes** : les listes se réordonnent par appui long dans le mode Listes. À
@@ -71,6 +76,7 @@ cd android && ./gradlew testDebugUnitTest     # tests des widgets (images dans a
 - `src/core/` — logique pure, sans interface :
   - `types.ts` modèle de données (listes, horaires, tâches, événements, objectifs, chrono, réglages) ;
   - `scheduler.ts` auto-planification (règles et score d'urgence documentés en tête du fichier) ;
+    `recurrence.ts` tâches récurrentes ;
     `cycleLoad.ts` charge de chaque jour selon le cycle ;
   - `daily.ts` to-do du jour et totaux ; `goals.ts` périodes de la checklist ; `checklist.ts` ordre et sous-tâches de la checklist ; `timer.ts` chrono ;
   - `time.ts`, `intervals.ts`, `windows.ts`, `events.ts` utilitaires (heure locale, récurrences) ;

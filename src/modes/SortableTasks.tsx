@@ -40,6 +40,8 @@ function metaFor(task: Task, subtasks: Task[], index: PlanIndex, now: Date): Met
   }
   if (progress) return { text: progress, late: false, flag: false };
   const planned = plannedLabel(index, task.id, now);
+  // Tâche récurrente : ↻ devant sa prochaine occurrence.
+  if (task.recurrence) return { text: `↻ ${planned ?? ''}`.trim(), late, flag: false };
   return planned ? { text: planned, late, flag: false } : undefined;
 }
 

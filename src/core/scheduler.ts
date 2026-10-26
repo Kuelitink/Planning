@@ -31,6 +31,9 @@
  *    dernier bloc de chaque dépendance non faite. Une tâche découpable remplit
  *    les trous par morceaux d'au moins `minChunkMin` ; sinon il faut un créneau
  *    d'un seul tenant.
+ *    Marges : une tâche peut demander du temps libre avant et après elle
+ *    (`bufferBeforeMin`, `bufferAfterMin`), en plus de la marge générale
+ *    (`bufferMin`) : elle ne colle pas à ce qui l'entoure et rien ne vient s'y coller.
  * 5. Une tâche qui finit après son échéance est placée mais signalée dans
  *    `atRisk`. Sans place dans l'horizon : `unscheduled` (`no-slot`). Les tâches
  *    d'un cycle de dépendances : `cycle` ; celles qui dépendent d'une tâche non
@@ -122,7 +125,7 @@ export function schedule(input: ScheduleInput): ScheduleResult {
     const start = parseDateTime(t.pinned.start);
     const end = parseDateTime(t.pinned.end);
     result.blocks.push({ taskId: t.id, start, end, pinned: true });
-    addBusy(start.getTime(), end.getTime());
+    addBusy(start.getTime() - marginBefore(t), end.getTime() + marginAfter(t));
     if (budget) consume(budget, start.getTime(), end.getTime());
     lastEnd.set(t.id, end.getTime());
     flagRisk(result, t, end);
@@ -218,7 +221,7 @@ export function schedule(input: ScheduleInput): ScheduleResult {
       if (end !== undefined && byId.get(d)?.status === 'todo') earliest = Math.max(earliest, end);
     }
 
-    const free = subtract(clip(availability(task), earliest, horizonEnd), busy);
+    const free = withMargins(subtract(clip(availability(task), earliest, horizonEnd), busy), busy, marginBefore(task), marginAfter(task));
     const duration = task.durationMin * MINUTE;
     const minChunk = Math.max(1, task.minChunkMin) * MINUTE;
     const place = (b: Budget | null) =>
@@ -234,7 +237,7 @@ export function schedule(input: ScheduleInput): ScheduleResult {
     }
     for (const iv of placed) {
       result.blocks.push({ taskId: task.id, start: new Date(iv.start), end: new Date(iv.end) });
-      addBusy(iv.start, iv.end);
+      addBusy(iv.start - marginBefore(task), iv.end + marginAfter(task));
       if (budget) consume(budget, iv.start, iv.end);
     }
     const end = placed[placed.length - 1].end;
@@ -317,6 +320,25 @@ function overBudget(budget: Budget, start: number, end: number): number | null {
 }
 
 // --- Placement ---------------------------------------------------------------
+
+const marginBefore = (t: Task) => Math.max(0, t.bufferBeforeMin ?? 0) * MINUTE;
+const marginAfter = (t: Task) => Math.max(0, t.bufferAfterMin ?? 0) * MINUTE;
+
+/**
+ * Créneaux libres réduits des marges de la tâche, là où ils touchent du temps occupé (au
+ * bord des horaires ou de « maintenant », rien n'est collé : pas besoin de marge).
+ */
+function withMargins(free: Interval[], busy: Interval[], before: number, after: number): Interval[] {
+  if (!before && !after) return free;
+  const busyEnds = new Set(busy.map((b) => b.end));
+  const busyStarts = new Set(busy.map((b) => b.start));
+  return free
+    .map((iv) => ({
+      start: busyEnds.has(iv.start) ? iv.start + before : iv.start,
+      end: busyStarts.has(iv.end) ? iv.end - after : iv.end,
+    }))
+    .filter((iv) => iv.end > iv.start);
+}
 
 /** Premier créneau d'un seul tenant assez long (et dans le budget), début aligné sur la grille. */
 function placeWhole(free: Interval[], earliest: number, duration: number, grid: number, budget: Budget | null): Interval[] | null {

@@ -292,6 +292,7 @@ export function TimelineView({
     [startKey, plan, tasks, events, windows, settings],
   );
   const atRisk = useMemo(() => new Set(plan.atRisk.map((r) => r.taskId)), [plan.atRisk]);
+  const recurring = useMemo(() => new Set(tasks.filter((t) => t.recurrence).map((t) => t.id)), [tasks]);
   // Phases du cycle : un repère dans l'en-tête des jours, pas sur la grille horaire.
   const cycleMarks = useCalendarMarks(toISODate(rangeStart), toISODate(addDays(rangeStart, RANGE - 1)));
   const todayISO = toISODate(now);
@@ -569,6 +570,11 @@ export function TimelineView({
                           {item.pinned && (
                             <span className="tl__pin" aria-hidden="true">
                               <IconPin size={11} />
+                            </span>
+                          )}
+                          {recurring.has(item.taskId) && (
+                            <span className="tl__pin" aria-hidden="true">
+                              ↻
                             </span>
                           )}
                           {item.title}

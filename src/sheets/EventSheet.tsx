@@ -8,17 +8,7 @@ import { useNav } from '../state/nav';
 import { Field, Sheet } from '../ui/kit';
 import { fromInputs, pad2, toInputDate, toInputTime } from '../ui/format';
 import '../modes/calendar.css';
-
-/** Jours dans l'ordre français (lundi d'abord). */
-const DAYS: { weekday: Weekday; short: string; name: string }[] = [
-  { weekday: 1, short: 'L', name: 'Lundi' },
-  { weekday: 2, short: 'M', name: 'Mardi' },
-  { weekday: 3, short: 'M', name: 'Mercredi' },
-  { weekday: 4, short: 'J', name: 'Jeudi' },
-  { weekday: 5, short: 'V', name: 'Vendredi' },
-  { weekday: 6, short: 'S', name: 'Samedi' },
-  { weekday: 0, short: 'D', name: 'Dimanche' },
-];
+import { WEEK_DAYS } from '../ui/format';
 
 /** `HH:MM` décalé de `delta` minutes (modulo 24 h). */
 function shiftTime(hm: string, delta: number): string {
@@ -76,7 +66,7 @@ export function EventSheet({ id, date, onClose }: { id?: ID; date?: Date; onClos
       if (e.getTime() <= s.getTime()) e = addDays(e, 1);
     }
     const recurrence: Recurrence | undefined = weekdays.length
-      ? { freq: 'weekly', weekdays: DAYS.map((d) => d.weekday).filter((w) => weekdays.includes(w)), until: until || undefined }
+      ? { freq: 'weekly', weekdays: WEEK_DAYS.map((d) => d.weekday).filter((w) => weekdays.includes(w)), until: until || undefined }
       : undefined;
     const fields: Omit<CalendarEvent, 'id' | 'createdAt' | 'updatedAt'> = {
       title: title.trim(),
@@ -139,7 +129,7 @@ export function EventSheet({ id, date, onClose }: { id?: ID; date?: Date; onClos
           )}
           <Field label="Répéter">
             <div className="day-chips" role="group" aria-label="Jours de répétition">
-              {DAYS.map((d) => (
+              {WEEK_DAYS.map((d) => (
                 <button
                   key={d.weekday}
                   type="button"

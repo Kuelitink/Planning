@@ -4,7 +4,7 @@ import type { Goal, TimeEntry } from '../src/core/types';
 import { schedule } from '../src/core/scheduler';
 import { initialSeed, sampleData } from '../src/state/defaults';
 import { computePlan, mergeSample, tasksForScheduling, type AppData } from '../src/state/store';
-import { at, blocksOf, settings, task } from './helpers';
+import { at, blocksOf, event, settings, task } from './helpers';
 
 const entry = (id: string, taskId: string, start: string, end?: string): TimeEntry =>
   createEntity<TimeEntry>(
@@ -199,5 +199,35 @@ describe('ordre des listes', () => {
     });
     const plan = computePlan(d, at('2026-10-19 08:00'));
     expect(plan.blocks.map((b) => b.taskId)).toEqual(['Première', 'Deuxième', 'Troisième']);
+  });
+});
+
+describe('récurrence et marges', () => {
+  it("une tâche récurrente est planifiée le jour de son occurrence, et due avant la fin du jour", () => {
+    const d = data({
+      tasks: [task('Sport', { durationMin: 60, recurrence: { freq: 'daily', interval: 1, start: '2026-10-19' }, occurrence: '2026-10-20' })],
+    });
+    const plan = computePlan(d, at('2026-10-19 08:00'));
+    expect(blocksOf(plan, 'Sport')).toEqual([['10-20 08:00', '10-20 09:00']]);
+    const t = tasksForScheduling(d, at('2026-10-19 08:00'))[0];
+    expect(new Date(t.deadline!).getTime()).toBe(at('2026-10-21 00:00').getTime());
+  });
+
+  it("une tâche de la checklist du jour déjà faite pour aujourd'hui n'y est plus pressée", () => {
+    const d = data({
+      tasks: [task('Sport', { priority: 4, recurrence: { freq: 'daily', interval: 1, start: '2026-10-19' }, occurrence: '2026-10-20' })],
+      goals: [goal('jour', 'day', '2026-10-19', ['Sport'])],
+    });
+    expect(tasksForScheduling(d, at('2026-10-19 08:00'))[0].priority).toBe(4);
+  });
+
+  it('les marges laissent du temps libre avant et après la tâche', () => {
+    const d = data({
+      tasks: [task('Rendez-vous', { durationMin: 60, priority: 1, bufferBeforeMin: 30, bufferAfterMin: 15 }), task('Mails', { durationMin: 30 })],
+      events: [event('Réunion', '2026-10-19 08:00', '2026-10-19 09:00')],
+    });
+    const plan = computePlan(d, at('2026-10-19 08:00'));
+    expect(blocksOf(plan, 'Rendez-vous')).toEqual([['10-19 09:30', '10-19 10:30']]);
+    expect(blocksOf(plan, 'Mails')).toEqual([['10-19 10:45', '10-19 11:15']]);
   });
 });

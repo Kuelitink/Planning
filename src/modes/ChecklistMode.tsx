@@ -103,6 +103,14 @@ export function ChecklistMode() {
   const periodStart = periodStartFor(period, anchor, settings.weekStartsOn);
   const isCurrent = periodStart === periodStartFor(period, now, settings.weekStartsOn);
   const byId = useMemo(() => new Map(tasks.map((t) => [t.id, t])), [tasks]);
+  const periodEndISO = toISODate(periodEnd(period, periodStart));
+  /** Faite pour la période : cochée, ou récurrente cochée dans la période (déjà à l'occurrence suivante). */
+  const doneForPeriod = (t?: Task) =>
+    Boolean(
+      t &&
+        (t.status === 'done' ||
+          (t.recurrence && t.occurrence && t.prevOccurrence && t.occurrence >= periodEndISO && t.prevOccurrence >= periodStart)),
+    );
   const picked = useMemo(() => pickedTaskIds(goals, period, periodStart), [goals, period, periodStart]);
   const rows = useMemo(() => checklistRows(picked, tasks), [picked, tasks]);
 
@@ -112,11 +120,11 @@ export function ChecklistMode() {
     const doneList: ChecklistRow[] = [];
     let target = todo;
     for (const r of rows) {
-      if (r.depth === 0) target = byId.get(r.id)?.status === 'done' ? doneList : todo;
+      if (r.depth === 0) target = doneForPeriod(byId.get(r.id)) ? doneList : todo;
       target.push(r);
     }
     return { todoRows: todo, doneRows: doneList };
-  }, [rows, byId]);
+  }, [rows, byId, periodEndISO, periodStart]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const topCount = rows.filter((r) => r.depth === 0).length;
   const doneCount = doneRows.filter((r) => r.depth === 0).length;
@@ -236,7 +244,7 @@ export function ChecklistMode() {
       <Collapsible label="Cochées" count={doneCount}>
         {doneRows.map((r) => {
           const task = byId.get(r.id);
-          return task ? <TaskRow key={r.id} task={task} indent={r.depth ? INDENT_PX : 0} /> : null;
+          return task ? <TaskRow key={r.id} task={task} indent={r.depth ? INDENT_PX : 0} done={doneForPeriod(task)} /> : null;
         })}
       </Collapsible>
 

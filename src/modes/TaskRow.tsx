@@ -59,11 +59,24 @@ export function shortDeadline(s: string, now: Date): string {
 }
 
 /** Ligne : case (priorité), titre (ouvre la fiche), info à droite, point de la liste. */
-export function TaskRow({ task, meta, late, indent }: { task: Task; meta?: string; late?: boolean; indent?: number }) {
+export function TaskRow({
+  task,
+  meta,
+  late,
+  indent,
+  done: doneOverride,
+}: {
+  task: Task;
+  meta?: string;
+  late?: boolean;
+  indent?: number;
+  /** Cochée pour la période affichée (tâche récurrente déjà passée à l'occurrence suivante). */
+  done?: boolean;
+}) {
   const { projects, setTaskDone, active } = useStore();
   const { openSheet, showToast } = useNav();
   const project = task.projectId ? projects.find((p) => p.id === task.projectId) : undefined;
-  const done = task.status === 'done';
+  const done = doneOverride ?? task.status === 'done';
   const running = active?.taskId === task.id;
 
   const toggle = (checked: boolean) => {
