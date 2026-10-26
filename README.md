@@ -25,6 +25,10 @@ dépendances, horaires, découpage) sont dans sa fiche : on l'ouvre en touchant 
   droite pour une sous-tâche) ; à priorité égale, une tâche plus haut dans sa liste est
   planifiée avant.
 - **Planning** : une case sur chaque tâche de la grille pour la terminer sans ouvrir sa fiche.
+- **Chrono** : la tâche en haut avec le temps déjà passé dessus, un cercle avec le temps, le
+  statut, play/pause et « Terminer », puis « Changer de tâche » (les plus probables d'abord,
+  et une recherche). Glisser vers la droite : le minuteur (5 à 60 min). Chaque arrêt ajoute
+  le temps de la session à la tâche.
 - **Sous-tâches** : planifiées chacune à la place de leur tâche mère, avec son échéance, sa
   priorité et sa place ; cocher la dernière coche la mère.
 - **Hiérarchie des listes** : à priorité égale, la liste du dessus passe avant celle du dessous

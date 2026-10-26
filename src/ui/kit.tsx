@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type { ID, Priority } from '../core/types';
-import { formatClock } from '../core/timer';
+import { countdownLeft, formatClock } from '../core/timer';
 import { formatDuration } from '../core/time';
 import { useStore } from '../state/store';
 import { MODE_LABEL, MODES, useNav, type Mode } from '../state/nav';
@@ -42,11 +42,16 @@ export const MODE_ICON: Record<Mode, (p: { size?: number }) => JSX.Element> = {
   settings: IconSettings,
 };
 
-/** Durée du chrono en cours, « 00:42 » (h:min) ou « 00:42:17 ». */
+/** Durée du chrono en cours, « 00:42 » (h:min) ou « 00:42:17 » ; minuteur : temps restant. */
 export function useTimerClock(withSeconds = false): string | null {
   const { active } = useStore();
   const now = useNow(1000);
   if (!active) return null;
+  const left = countdownLeft(active, now);
+  if (left !== undefined) {
+    const clock = formatClock(Math.ceil(left) * 1000);
+    return left >= 3600 ? clock : clock.slice(3);
+  }
   const clock = formatClock(now.getTime() - new Date(active.start).getTime());
   return withSeconds ? clock : clock.slice(0, 5);
 }

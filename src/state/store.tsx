@@ -90,8 +90,10 @@ export interface Store extends AppData {
   active?: TimeEntry;
   /** Dernière tâche chronométrée (pour reprendre après une pause). */
   lastTimedTaskId?: ID;
-  startTimer(taskId?: ID): void;
-  pauseTimer(): void;
+  /** Démarre le chrono (ou un minuteur de `countdownSec` secondes) sur une tâche. */
+  startTimer(taskId?: ID, countdownSec?: number): void;
+  /** Arrête la session en cours (à `at`, par défaut maintenant) ; le temps passé reste sur la tâche. */
+  pauseTimer(at?: Date): void;
   /** Arrête le chrono et marque la tâche faite. */
   finishTimer(): void;
   /** Temps passé sur une tâche, en ms. */
@@ -671,8 +673,8 @@ export function StoreProvider({ children, repository }: { children: ReactNode; r
   }, [data.timeEntries]);
 
   const startTimer = useCallback(
-    (taskId?: ID) => {
-      const { entries, started, stopped } = startEntry(dataRef.current.timeEntries, taskId, new Date());
+    (taskId?: ID, countdownSec?: number) => {
+      const { entries, started, stopped } = startEntry(dataRef.current.timeEntries, taskId, new Date(), undefined, countdownSec);
       setData((d) => ({ ...d, timeEntries: entries }));
       if (stopped) persist('timeEntries', stopped);
       persist('timeEntries', started);
@@ -680,8 +682,8 @@ export function StoreProvider({ children, repository }: { children: ReactNode; r
     [persist],
   );
 
-  const pauseTimer = useCallback(() => {
-    const { entries, stopped } = stopEntry(dataRef.current.timeEntries, new Date());
+  const pauseTimer = useCallback((at?: Date) => {
+    const { entries, stopped } = stopEntry(dataRef.current.timeEntries, at ?? new Date());
     setData((d) => ({ ...d, timeEntries: entries }));
     if (stopped) persist('timeEntries', stopped);
   }, [persist]);

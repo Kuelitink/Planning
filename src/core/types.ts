@@ -142,6 +142,8 @@ export interface TimeEntry extends Entity {
   taskId?: ID;
   start: ISODateTime;
   end?: ISODateTime;
+  /** Session de minuteur : secondes restantes au départ (elle s'arrête d'elle-même à zéro). */
+  countdownSec?: number;
 }
 
 /** Intensité des règles, comme dans Clue. */

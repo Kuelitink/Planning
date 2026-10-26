@@ -1,0 +1,332 @@
+/* Mode Chrono : chrono et minuteur côte à côte, cercle central, points de page. */
+
+.chrono-pager {
+  margin: 0 -16px;
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+
+.chrono-pager::-webkit-scrollbar {
+  display: none;
+}
+
+.chrono-page {
+  flex: none;
+  width: 100%;
+  scroll-snap-align: start;
+  padding: 0 16px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 16px;
+}
+
+/* La tâche, dans son encadré blanc. */
+.chrono-card {
+  padding: 14px 18px;
+  border: var(--stroke);
+  border-radius: 22px;
+  background: var(--card);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.chrono-card__title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 500;
+  line-height: 1.25;
+}
+
+.chrono-card__meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.chrono-card__meta b {
+  color: var(--ink);
+}
+
+/* Le cercle : temps, statut, play et « Terminer » à l'intérieur. */
+.chrono-dial {
+  position: relative;
+  width: min(280px, 100%);
+  aspect-ratio: 1;
+  align-self: center;
+}
+
+.chrono-dial > svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.chrono-dial__track {
+  fill: var(--card);
+  stroke: var(--line);
+  stroke-width: 4;
+}
+
+.chrono-dial__arc {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+
+.chrono-dial__rim {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 0.8;
+}
+
+.chrono-dial__inner {
+  position: absolute;
+  inset: 0;
+  padding-top: 22px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.chrono-dial__controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.chrono-clock {
+  font-size: 46px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.chrono-clock--idle {
+  color: var(--faint);
+}
+
+.chrono-status {
+  height: 26px;
+  padding: 0 11px;
+  border: 1.5px solid var(--ink);
+  border-radius: 999px;
+  background: var(--card);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.chrono-status__led {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--faint);
+}
+
+.chrono-status--run {
+  background: var(--picked);
+}
+
+.chrono-status--run .chrono-status__led {
+  background: var(--accent);
+  animation: chrono-blink 1.2s infinite;
+}
+
+.chrono-status--done {
+  background: var(--pop);
+}
+
+@keyframes chrono-blink {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chrono-status--run .chrono-status__led {
+    animation: none;
+  }
+}
+
+.chrono-play {
+  width: 64px;
+  height: 64px;
+  border: var(--stroke);
+  border-radius: 50%;
+  background: var(--ink);
+  color: #fff;
+  display: grid;
+  place-items: center;
+}
+
+.chrono-play--on {
+  background: var(--accent);
+}
+
+.chrono-done {
+  height: 48px;
+  padding: 0 18px;
+  border: var(--stroke);
+  border-radius: 999px;
+  background: var(--card);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.chrono-done:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.chrono-switch {
+  height: 52px;
+  width: 100%;
+  border: var(--stroke);
+  border-radius: 999px;
+  background: var(--card);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.chrono-presets {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+
+.chrono-presets button {
+  height: 34px;
+  padding: 0 12px;
+  border: 1.5px solid var(--ink);
+  border-radius: 999px;
+  background: var(--card);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.chrono-presets button[aria-pressed='true'] {
+  background: var(--picked);
+}
+
+.chrono-cancel {
+  align-self: center;
+}
+
+/* Points de page, en bas de l'écran : le grand = l'écran affiché. */
+.chrono-dots {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--safe-bottom) + 16px);
+  transform: translateX(-50%);
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.chrono-dots button {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  display: grid;
+  place-items: center;
+}
+
+.chrono-dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ink);
+  transition: width 0.15s, height 0.15s;
+}
+
+.chrono-dots button[aria-current='true'] span {
+  width: 11px;
+  height: 11px;
+}
+
+/* Feuille « Changer de tâche ». */
+.switch-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.switch-list__row {
+  width: 100%;
+  min-height: 56px;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 14px;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+}
+
+.switch-list__row:active {
+  background: var(--bg);
+}
+
+.switch-list__main {
+  flex: 1;
+  min-width: 0;
+}
+
+.switch-list__title,
+.switch-list__why {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.switch-list__title {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.switch-list__why {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.switch-list__time {
+  flex: none;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--muted);
+}

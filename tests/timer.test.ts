@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { activeEntry, formatClock, startTimer, stopTimer, totalForDay, totalForWeek, totalsByTask } from '../src/core/timer';
+import { activeEntry, countdownEnd, countdownLeft, formatClock, startTimer, stopTimer, totalForDay, totalForWeek, totalsByTask } from '../src/core/timer';
 import { createEntity } from '../src/core/entity';
 import type { TimeEntry } from '../src/core/types';
 import { at } from './helpers';
@@ -44,5 +44,21 @@ describe('chrono', () => {
   it('formate le chrono', () => {
     expect(formatClock(42 * MIN + 17_000)).toBe('00:42:17');
     expect(formatClock(3 * 3600_000 + 5_000)).toBe('03:00:05');
+  });
+});
+
+describe('minuteur', () => {
+  it('compte à rebours depuis le temps restant au départ, sans descendre sous zéro', () => {
+    const { started } = startTimer([], 'Rapport', at('2026-10-19 09:00'), 'm1', 25 * 60);
+    expect(started.countdownSec).toBe(1500);
+    expect(countdownEnd(started)?.getTime()).toBe(at('2026-10-19 09:25').getTime());
+    expect(countdownLeft(started, at('2026-10-19 09:10'))).toBe(15 * 60);
+    expect(countdownLeft(started, at('2026-10-19 10:00'))).toBe(0);
+  });
+
+  it("un chrono n'a pas de temps restant", () => {
+    const { started } = startTimer([], 'Rapport', at('2026-10-19 09:00'), 'c1');
+    expect(started.countdownSec).toBeUndefined();
+    expect(countdownLeft(started, at('2026-10-19 09:10'))).toBeUndefined();
   });
 });

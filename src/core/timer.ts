@@ -17,16 +17,36 @@ export function stopTimer(entries: TimeEntry[], now: Date): { entries: TimeEntry
   return { entries: entries.map((e) => (e.id === active.id ? stopped : e)), stopped };
 }
 
-/** Démarre un chrono sur `taskId` ; le chrono en cours est arrêté d'abord. */
+/**
+ * Démarre un chrono sur `taskId` (un minuteur si `countdownSec` est donné) ; le chrono en
+ * cours est arrêté d'abord.
+ */
 export function startTimer(
   entries: TimeEntry[],
   taskId: ID | undefined,
   now: Date,
   id?: ID,
+  countdownSec?: number,
 ): { entries: TimeEntry[]; started: TimeEntry; stopped?: TimeEntry } {
   const { entries: afterStop, stopped } = stopTimer(entries, now);
-  const started = createEntity<TimeEntry>({ taskId, start: now.toISOString() }, now, id);
+  const fields: Omit<TimeEntry, 'id' | 'createdAt' | 'updatedAt'> = { taskId, start: now.toISOString() };
+  if (countdownSec !== undefined) fields.countdownSec = Math.max(0, Math.round(countdownSec));
+  const started = createEntity<TimeEntry>(fields, now, id);
   return { entries: [...afterStop, started], started, stopped };
+}
+
+/** Minuteur : fin prévue de la session (absent pour un chrono). */
+export function countdownEnd(entry: TimeEntry): Date | undefined {
+  if (entry.countdownSec === undefined) return undefined;
+  return new Date(parseDateTime(entry.start).getTime() + entry.countdownSec * 1000);
+}
+
+/** Minuteur : secondes restantes à `now` (0 au plus bas ; absent pour un chrono). */
+export function countdownLeft(entry: TimeEntry, now: Date): number | undefined {
+  const end = countdownEnd(entry);
+  if (!end) return undefined;
+  const stop = entry.end ? parseDateTime(entry.end).getTime() : now.getTime();
+  return Math.max(0, (end.getTime() - stop) / 1000);
 }
 
 /** Durée d'une session (en cours : jusqu'à `now`), en ms. */

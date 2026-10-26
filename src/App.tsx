@@ -22,6 +22,7 @@ import { CycleExportSheet } from './sheets/CycleExportSheet';
 import { GitHubSyncSheet } from './sheets/GitHubSyncSheet';
 import { SyncProvider } from './state/sync';
 import { useCycleNotifications } from './state/cycle';
+import { useCountdownWatcher } from './state/countdown';
 import { isNative } from './native/platform';
 import { NativeBridge } from './native/NativeBridge';
 
@@ -82,6 +83,12 @@ function CycleNotifications() {
   return null;
 }
 
+/** Arrêt du minuteur à zéro, même hors du mode Chrono. */
+function CountdownWatcher() {
+  useCountdownWatcher();
+  return null;
+}
+
 function Shell() {
   const { ready } = useStore();
   if (!ready) return <main className="app" aria-busy="true" />;
@@ -94,6 +101,7 @@ function Shell() {
       <CurrentSheet />
       <ToastView />
       <CycleNotifications />
+      <CountdownWatcher />
       {isNative && <NativeBridge />}
     </>
   );
