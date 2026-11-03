@@ -51,11 +51,49 @@
 }
 
 .cl-summary {
+  margin: 0 0 12px 4px;
+}
+
+/* Tâches planifiées aujourd'hui, au-dessus de celles ajoutées à la checklist. */
+.cl-planned {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+}
+
+/* Tâches existantes proposées en tapant. */
+.cl-suggest {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 4px;
+  border: var(--stroke);
+  border-radius: 16px;
+  background: var(--card);
+}
+
+.cl-suggest button {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin: 0 0 12px 4px;
+  gap: 10px;
+  text-align: left;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.cl-suggest button:active {
+  background: var(--soft);
+}
+
+.cl-suggest span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .cl-list {

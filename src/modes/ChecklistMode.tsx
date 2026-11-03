@@ -16,9 +16,9 @@ import { addDays, formatHM, parseISODate, startOfDay, toISODate } from '../core/
 import { dayPlan } from '../core/daily';
 import { useStore } from '../state/store';
 import { useNav } from '../state/nav';
-import { pickedTaskIds } from '../state/urgency';
+import { fold, matchesQuery, pickedTaskIds } from '../state/urgency';
 import { Fab, Header, useNow } from '../ui/kit';
-import { IconChevronLeft, IconChevronRight, IconZap } from '../ui/icons';
+import { IconChevronLeft, IconChevronRight, IconPlus } from '../ui/icons';
 import { formatDayMonth, formatMonth, formatRelativeDay, isoWeek } from '../ui/format';
 import { Collapsible, TaskRow } from './TaskRow';
 import { INDENT_PX, SortableTaskList } from './SortableTasks';
@@ -85,14 +85,11 @@ export function PeriodPicker({ value, onChange }: { value: GoalPeriod; onChange:
 }
 
 
-const EMPTY_TEXT: Record<GoalPeriod, string> = {
-  day: "Ajoute ce que tu veux faire aujourd'hui.",
-  week: 'Ajoute ce que tu veux faire cette semaine.',
-  month: 'Ajoute ce que tu veux faire ce mois-ci.',
-};
+/** Tâches existantes proposées en tapant dans « Ajouter une tâche ». */
+const SUGGESTIONS = 3;
 
 export function ChecklistMode() {
-  const { goals, tasks, projects, settings, plan, events, windows, addTask, pickTask, unpickTask, applyChecklist, replan } = useStore();
+  const { goals, tasks, projects, settings, plan, events, windows, addTask, pickTask, unpickTask, applyChecklist } = useStore();
   const { openSheet, showToast } = useNav();
   const [period, setPeriodState] = useState<GoalPeriod>(readPeriod);
   const [anchor, setAnchor] = useState(() => new Date());
@@ -171,13 +168,31 @@ export function ChecklistMode() {
     e.preventDefault();
     const title = draft.trim();
     if (!title) return;
+    // Titre identique à une tâche existante : on l'ajoute plutôt que d'en créer une deuxième.
+    const same = suggestions.find((t) => fold(t.title.trim()) === fold(title));
+    if (same) return addExisting(same.id);
     const first = projects.filter((p) => !p.archived).sort((a, b) => a.order - b.order)[0];
     const task = addTask({ title, projectId: first?.id });
     pickTask(task.id, period, periodStart);
     setDraft('');
   };
 
-  const emptyText = period === 'day' && !isCurrent ? 'Ajoute ce que tu veux faire ce jour-là.' : EMPTY_TEXT[period];
+  const addExisting = (id: ID) => {
+    pickTask(id, period, periodStart);
+    setDraft('');
+  };
+
+  /** Tâches à faire dont le titre contient ce qu'on tape (celles qui commencent pareil d'abord), hors checklist. */
+  const suggestions = useMemo(() => {
+    const q = draft.trim();
+    if (!q) return [];
+    const inList = new Set(rows.map((r) => r.id));
+    const starts = (t: Task) => (fold(t.title).startsWith(fold(q)) ? 0 : 1);
+    return tasks
+      .filter((t) => t.status === 'todo' && !inList.has(t.id) && matchesQuery(t.title, q))
+      .sort((a, b) => starts(a) - starts(b) || a.priority - b.priority || a.title.localeCompare(b.title, 'fr'))
+      .slice(0, SUGGESTIONS);
+  }, [draft, tasks, rows]);
 
   return (
     <>
@@ -202,28 +217,22 @@ export function ChecklistMode() {
         </button>
       </div>
 
-      <div className="cl-summary">
-        <p className="subtitle" style={{ margin: 0 }}>
-          {topCount ? `${doneCount} sur ${topCount} faite${doneCount > 1 ? 's' : ''}` : ' '}
+      {topCount > 0 && (
+        <p className="subtitle cl-summary">
+          {doneCount} sur {topCount} faite{doneCount > 1 ? 's' : ''}
         </p>
-        <button
-          type="button"
-          className="pill pill--sm pill--pop"
-          onClick={() => {
-            replan();
-            showToast({ message: 'Planning recalculé' });
-          }}
-        >
-          <IconZap size={16} />
-          <span>Auto-planifier</span>
-        </button>
-      </div>
-
-      {todoRows.length > 0 ? (
-        <SortableTaskList rows={todoRows} tasks={byId} onRows={saveRows} onRemove={remove} />
-      ) : (
-        topCount === 0 && <p className="empty" style={{ padding: '24px 16px 8px' }}>{emptyText}</p>
       )}
+
+      {/* Les tâches planifiées aujourd'hui, puis celles ajoutées à la checklist. */}
+      {alsoToday.length > 0 && (
+        <ul className="stack cl-planned">
+          {alsoToday.map(({ task, start }) => (
+            <TaskRow key={task.id} task={task} meta={formatHM(start)} late={plan.atRisk.some((r) => r.taskId === task.id)} />
+          ))}
+        </ul>
+      )}
+
+      {todoRows.length > 0 && <SortableTaskList rows={todoRows} tasks={byId} onRows={saveRows} onRemove={remove} />}
 
       <form onSubmit={add} className="cl-add">
         <label htmlFor={inputId} className="sr-only">
@@ -238,8 +247,19 @@ export function ChecklistMode() {
           enterKeyHint="done"
           autoComplete="off"
         />
+        {suggestions.length > 0 && (
+          <ul className="cl-suggest" aria-label="Tâches existantes">
+            {suggestions.map((t) => (
+              <li key={t.id}>
+                <button type="button" onClick={() => addExisting(t.id)}>
+                  <IconPlus size={16} />
+                  <span>{t.title}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </form>
-      {todoRows.length > 1 && <p className="cl-tip">Appui long pour déplacer · glisser à droite pour une sous-tâche</p>}
 
       <Collapsible label="Cochées" count={doneCount}>
         {doneRows.map((r) => {
@@ -247,14 +267,6 @@ export function ChecklistMode() {
           return task ? <TaskRow key={r.id} task={task} indent={r.depth ? INDENT_PX : 0} done={doneForPeriod(task)} /> : null;
         })}
       </Collapsible>
-
-      {alsoToday.length > 0 && (
-        <Collapsible label="Aussi prévu aujourd'hui" count={alsoToday.length}>
-          {alsoToday.map(({ task, start }) => (
-            <TaskRow key={task.id} task={task} meta={formatHM(start)} late={plan.atRisk.some((r) => r.taskId === task.id)} />
-          ))}
-        </Collapsible>
-      )}
 
       <Fab label="Ajouter des tâches existantes" onClick={openPicker} />
     </>
