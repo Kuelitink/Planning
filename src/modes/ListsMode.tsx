@@ -16,7 +16,7 @@ import { useNav } from '../state/nav';
 import { Dot, Fab, Header } from '../ui/kit';
 import { NEUTRAL_TONE } from '../ui/palette';
 import { IconChevronLeft, IconChevronRight, IconPlus } from '../ui/icons';
-import { checklistRows, listChanges, listTopIds, type ChecklistRow } from '../core/checklist';
+import { blockOf, checklistRows, listChanges, listTopIds, type ChecklistRow } from '../core/checklist';
 import { Collapsible, LIST_STYLE, TaskRow } from './TaskRow';
 import { INDENT_PX, SortableTaskList } from './SortableTasks';
 import { ReorderList } from '../ui/ReorderList';
@@ -97,7 +97,7 @@ function ListOverview() {
 }
 
 function ListDetail({ id }: { id: ID }) {
-  const { projects, tasks, addTask, reorderTasks } = useStore();
+  const { projects, tasks, addTask, saveTask, deleteTask, reorderTasks } = useStore();
   const { openSheet, setOpenListId } = useNav();
   const inputId = useId();
   const [draft, setDraft] = useState('');
@@ -143,6 +143,25 @@ function ListDetail({ id }: { id: ID }) {
 
   const saveRows = (next: ChecklistRow[]) => reorderTasks(listChanges([...next, ...doneRows], tasks));
 
+  const rename = (taskId: ID, title: string) => {
+    const t = byId.get(taskId);
+    if (t) saveTask({ ...t, title });
+  };
+
+  /** Entrée dans un titre : nouvelle tâche juste en dessous (sous-tâche si la ligne en est une). */
+  const insertAfter = (taskId: ID): ID | undefined => {
+    const i = todoRows.findIndex((r) => r.id === taskId);
+    if (i < 0) return undefined;
+    const row = todoRows[i];
+    const child = row.depth === 1;
+    const parentId = child ? byId.get(taskId)?.parentId : undefined;
+    const created = addTask({ title: '', projectId: projectId ?? byId.get(taskId)?.projectId, parentId });
+    const at = child ? i + 1 : blockOf(todoRows, i)[1];
+    const next = [...todoRows.slice(0, at), { id: created.id, depth: row.depth, orphan: false }, ...todoRows.slice(at)];
+    reorderTasks(listChanges([...next, ...doneRows], [...tasks, created]));
+    return created.id;
+  };
+
   const submit = (e: FormEvent) => {
     e.preventDefault();
     const title = draft.trim();
@@ -179,7 +198,7 @@ function ListDetail({ id }: { id: ID }) {
       <p className="subtitle">{subtitle}</p>
 
       <div style={{ marginTop: 20 }}>
-        {todoRows.length > 0 && <SortableTaskList rows={todoRows} tasks={byId} onRows={saveRows} />}
+        {todoRows.length > 0 && <SortableTaskList rows={todoRows} tasks={byId} onRows={saveRows} onRename={rename} onEnter={insertAfter} onEmpty={deleteTask} />}
       </div>
 
       <form onSubmit={submit} className="cl-add">

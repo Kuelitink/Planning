@@ -22,7 +22,8 @@ dépendances, horaires, découpage) sont dans sa fiche : on l'ouvre en touchant 
   sous-tâche de la ligne du dessus (elle suit sa mère), à gauche pour la remettre au premier
   niveau ou la retirer. Une tâche ajoutée dans la checklist est planifiée.
 - **Listes** : même fonctionnement que la Checklist (appui long pour réordonner, glisser à
-  droite pour une sous-tâche) ; à priorité égale, une tâche plus haut dans sa liste est
+  droite pour une sous-tâche) ; toucher le nom d'une tâche le modifie sur place, Entrée crée
+  une nouvelle tâche juste en dessous, l'échéance à droite ouvre la fiche ; à priorité égale, une tâche plus haut dans sa liste est
   planifiée avant.
 - **Planning** : une case sur chaque tâche de la grille pour la terminer sans ouvrir sa fiche ;
   un champ « + Ajouter une tâche… » au-dessus de la grille (la tâche rejoint la checklist du

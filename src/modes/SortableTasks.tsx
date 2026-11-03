@@ -70,10 +70,22 @@ export function SortableTaskList({
   onRows,
   onRemove,
   removeLabel = 'Retirer',
+  onRename,
+  onEnter,
+  onEmpty,
 }: {
   rows: ChecklistRow[];
   tasks: Map<ID, Task>;
   onRows: (rows: ChecklistRow[]) => void;
+  /**
+   * Toucher le titre le modifie sur place (l'échéance, à droite, ouvre toujours la fiche).
+   * Absent : toucher le titre ouvre la fiche.
+   */
+  onRename?: (id: ID, title: string) => void;
+  /** Entrée dans un titre : nouvelle tâche juste en dessous, dont on modifie aussitôt le titre. */
+  onEnter?: (id: ID) => ID | undefined;
+  /** Titre laissé vide (nouvelle tâche abandonnée). */
+  onEmpty?: (id: ID) => void;
   /** Glisser à gauche une tâche de premier niveau (absent : rien). */
   onRemove?: (id: ID) => void;
   /** Texte affiché pendant ce glissement. */
@@ -86,6 +98,8 @@ export function SortableTaskList({
   const [swipe, setSwipe] = useState<{ index: number; dx: number } | null>(null);
   const [drag, setDrag] = useState<{ index: number; dy: number; to: number } | null>(null);
   const lastY = useRef(0);
+  /** Tâche dont le titre est en cours de modification. */
+  const [editingId, setEditingId] = useState<ID | null>(null);
 
   // Pendant un geste, la page ne défile pas (écouteur non passif, seul moyen de l'empêcher).
   useEffect(() => {
@@ -286,6 +300,21 @@ export function SortableTaskList({
             hint={hint}
             hintSide={swipe?.index === i && swipe.dx < 0 ? 'right' : 'left'}
             swallowClick={swallowClick}
+            editing={editingId === row.id}
+            onEdit={onRename ? () => setEditingId(row.id) : undefined}
+            onCommit={(title, enter) => {
+              setEditingId(null);
+              const clean = title.trim();
+              if (!clean) {
+                if (!task.title.trim()) onEmpty?.(row.id);
+                return;
+              }
+              if (clean !== task.title) onRename?.(row.id, clean);
+              if (enter) {
+                const next = onEnter?.(row.id);
+                if (next) setEditingId(next);
+              }
+            }}
             onPointerDown={onPointerDown(i)}
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
@@ -309,6 +338,9 @@ function ChecklistItem({
   hint,
   hintSide,
   swallowClick,
+  editing,
+  onEdit,
+  onCommit,
   ...handlers
 }: {
   task: Task;
@@ -321,6 +353,9 @@ function ChecklistItem({
   hint?: string;
   hintSide?: 'left' | 'right';
   swallowClick?: { current: boolean };
+  editing?: boolean;
+  onEdit?: () => void;
+  onCommit?: (title: string, enter: boolean) => void;
   onPointerDown?: (e: ReactPointerEvent<HTMLLIElement>) => void;
   onPointerMove?: (e: ReactPointerEvent<HTMLLIElement>) => void;
   onPointerUp?: () => void;
@@ -369,10 +404,18 @@ function ChecklistItem({
         onChange={toggle}
         label={done ? `Remettre « ${task.title} » à faire` : `Terminer « ${task.title} »`}
       />
-      <button type="button" className={done ? 'row__title row__title--done cl-row__title' : 'row__title cl-row__title'} onClick={open}>
-        {task.title}
-        {parentTitle && <span className="cl-row__parent">↳ {parentTitle}</span>}
-      </button>
+      {editing ? (
+        <TitleInput title={task.title} onCommit={(title, enter) => onCommit?.(title, enter)} />
+      ) : (
+        <button
+          type="button"
+          className={done ? 'row__title row__title--done cl-row__title' : 'row__title cl-row__title'}
+          onClick={onEdit ? () => (swallowClick?.current ? undefined : onEdit()) : open}
+        >
+          {task.title || '\u00a0'}
+          {parentTitle && <span className="cl-row__parent">↳ {parentTitle}</span>}
+        </button>
+      )}
       {project && <Dot color={project.color} />}
       <button
         type="button"
@@ -393,5 +436,34 @@ function ChecklistItem({
         <IconChevronRight size={16} />
       </button>
     </li>
+  );
+}
+
+/** Titre modifié sur place : Entrée valide (et crée la tâche suivante), Échap annule. */
+function TitleInput({ title, onCommit }: { title: string; onCommit: (title: string, enter: boolean) => void }) {
+  const [value, setValue] = useState(title);
+  const done = useRef(false);
+  const commit = (enter: boolean, v = value) => {
+    if (done.current) return;
+    done.current = true;
+    onCommit(v, enter);
+  };
+  return (
+    <input
+      className="cl-row__input"
+      value={value}
+      autoFocus
+      enterKeyHint="next"
+      aria-label="Titre de la tâche"
+      placeholder="Nouvelle tâche"
+      onChange={(e) => setValue(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          commit(true);
+        } else if (e.key === 'Escape') commit(false, title);
+      }}
+      onBlur={() => commit(false)}
+    />
   );
 }

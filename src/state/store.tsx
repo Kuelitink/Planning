@@ -450,6 +450,8 @@ export function StoreProvider({ children, repository }: { children: ReactNode; r
   const saveIn = useCallback(
     <K extends Exclude<CollectionName, 'timeEntries'>>(collection: K, item: AppData[K][number]) => {
       const saved = touch(item as Entity) as AppData[K][number];
+      // Référence à jour tout de suite, pour les actions enchaînées dans le même geste.
+      dataRef.current = { ...dataRef.current, [collection]: upsert(dataRef.current[collection] as Entity[], saved as Entity) };
       setData((d) => ({ ...d, [collection]: upsert(d[collection] as Entity[], saved as Entity) }));
       persist(collection, saved);
     },
@@ -460,6 +462,8 @@ export function StoreProvider({ children, repository }: { children: ReactNode; r
   const addTask = useCallback(
     (fields: NewTask) => {
       const task = createTask(fields);
+      // Référence à jour tout de suite : une action enchaînée (ranger la tâche…) la voit.
+      dataRef.current = { ...dataRef.current, tasks: [...dataRef.current.tasks, task] };
       setData((d) => ({ ...d, tasks: [...d.tasks, task] }));
       persist('tasks', task);
       return task;

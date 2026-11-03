@@ -201,3 +201,17 @@
   color: var(--faint);
   text-align: center;
 }
+
+/* Titre modifié sur place (mode Listes). */
+.cl-row__input {
+  flex: 1;
+  min-width: 0;
+  height: 40px;
+  padding: 0 8px;
+  border: none;
+  border-bottom: 1.5px solid var(--ink);
+  background: transparent;
+  font-size: 16px;
+  font-weight: 600;
+  outline: none;
+}
