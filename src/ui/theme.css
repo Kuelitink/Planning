@@ -848,3 +848,69 @@ button {
 .reorder-list__item--lifted > * {
   box-shadow: 0 8px 20px rgba(58, 15, 36, 0.18);
 }
+
+/* Fiche tâche : réglages repliés sous « Plus », temps passé, dépendances. */
+.task-more {
+  margin-top: 4px;
+  border-top: 1px solid var(--line);
+}
+
+.task-more > summary {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  list-style: none;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.task-more > summary::-webkit-details-marker {
+  display: none;
+}
+
+.task-more > summary::before {
+  content: '›';
+  display: inline-block;
+  width: 14px;
+  font-size: 20px;
+  transition: transform 0.15s;
+}
+
+.task-more[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.task-spent {
+  margin: 12px 0 0;
+  padding: 10px 14px;
+  border: 1.5px solid var(--line);
+  border-radius: 14px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.task-spent b {
+  color: var(--ink);
+}
+
+.dep-field {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.dep-field__add {
+  height: 40px;
+  padding: 0 12px;
+  border: var(--stroke);
+  border-radius: 12px;
+  background: var(--card);
+  font-size: 15px;
+}

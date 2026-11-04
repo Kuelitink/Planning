@@ -10,6 +10,7 @@ import { DurationSelect, Field, PriorityPicker, Sheet } from '../ui/kit';
 import { WEEK_DAYS, formatRelativeDay, fromInputs, toInputDate, toInputTime } from '../ui/format';
 import { IconX } from '../ui/icons';
 import { REASON_LABEL } from '../modes/TaskRow';
+import { TaskPickList } from './GoalPickSheet';
 
 const CHUNKS = [15, 30, 45, 60];
 
@@ -136,6 +137,40 @@ function nextHour(): Date {
   return d;
 }
 
+/** Dépendances (« Après » / « Avant ») : une puce par tâche, et de quoi en choisir. */
+function DependencyField({
+  label,
+  hint,
+  ids,
+  byId,
+  onRemove,
+  onPick,
+}: {
+  label: string;
+  hint: string;
+  ids: ID[];
+  byId: Map<ID, Task>;
+  onRemove: (id: ID) => void;
+  onPick: () => void;
+}) {
+  const shown = ids.map((d) => byId.get(d)).filter((t): t is Task => Boolean(t));
+  return (
+    <Field label={label}>
+      <span className="dep-field">
+        {shown.map((t) => (
+          <button key={t.id} type="button" className="chip" aria-label={`Retirer « ${t.title} »`} onClick={() => onRemove(t.id)} style={{ maxWidth: 200 }}>
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title}</span>
+            <IconX size={14} />
+          </button>
+        ))}
+        <button type="button" className="dep-field__add" onClick={onPick} aria-label={`${label} : choisir les tâches (${hint.toLowerCase()})`}>
+          {shown.length ? 'Ajouter…' : 'Aucune'}
+        </button>
+      </span>
+    </Field>
+  );
+}
+
 /** Échéance stockée → champs date / heure du formulaire. */
 function splitDeadline(value?: string): { date: string; time: string } {
   if (!value) return { date: '', time: '' };
@@ -187,6 +222,10 @@ export function TaskSheet({ id, defaults, onClose }: { id?: ID; defaults?: Parti
   const [repeatDays, setRepeatDays] = useState<Weekday[]>(rec?.weekdays ?? []);
   const [nextDate, setNextDate] = useState(base.occurrence ?? toInputDate(new Date()));
   const [until, setUntil] = useState(rec?.until ?? '');
+  // Tâches à faire après celle-ci (elles dépendent d'elle) ; choix des dépendances ; « Plus » déplié.
+  const [before, setBefore] = useState<ID[]>(() => (id ? tasks.filter((t) => t.dependsOn.includes(id)).map((t) => t.id) : []));
+  const [picking, setPicking] = useState<'after' | 'before' | null>(null);
+  const [moreOpen, setMoreOpen] = useState(false);
   // Marges libres avant / après la tâche.
   const [bufferBefore, setBufferBefore] = useState(base.bufferBeforeMin ?? 0);
   const [bufferAfter, setBufferAfter] = useState(base.bufferAfterMin ?? 0);
@@ -221,15 +260,6 @@ export function TaskSheet({ id, defaults, onClose }: { id?: ID; defaults?: Parti
     const w = wid ? windows.find((x) => x.id === wid) : undefined;
     return w?.name ?? `${settings.dayStart}–${settings.dayEnd}`;
   }, [projects, projectId, settings, windows]);
-
-  /** Tâches qu'on peut ajouter comme « à faire avant ». */
-  const candidates = useMemo(
-    () =>
-      tasks.filter(
-        (t) => t.status === 'todo' && t.id !== id && !dependsOn.includes(t.id) && !(id && t.dependsOn.includes(id)),
-      ),
-    [tasks, id, dependsOn],
-  );
 
   if (missing) return null;
 
@@ -304,8 +334,15 @@ export function TaskSheet({ id, defaults, onClose }: { id?: ID; defaults?: Parti
       minChunkMin,
       notes: notes.trim() || undefined,
     };
-    if (task) store.saveTask({ ...task, ...fields });
-    else store.addTask(fields);
+    const saved = task ? (store.saveTask({ ...task, ...fields }), task) : store.addTask(fields);
+    // « Avant » : ces tâches-là dépendent de celle-ci.
+    for (const t of tasks) {
+      if (t.id === saved.id) continue;
+      const wants = before.includes(t.id);
+      const has = t.dependsOn.includes(saved.id);
+      if (wants && !has) store.saveTask({ ...t, dependsOn: [...t.dependsOn, saved.id] });
+      if (!wants && has) store.saveTask({ ...t, dependsOn: t.dependsOn.filter((d) => d !== saved.id) });
+    }
     onClose();
   };
 
@@ -387,6 +424,32 @@ export function TaskSheet({ id, defaults, onClose }: { id?: ID; defaults?: Parti
             <PriorityPicker value={priority} onChange={setPriority} />
           </Field>
 
+          {!fixed && repeat === 'none' && (
+            <Field label="Pour le" htmlFor={ids.deadline}>
+              <OptionalDate
+                id={ids.deadline}
+                label="Pour le"
+                value={deadlineDate}
+                onChange={(d) => {
+                  setDeadlineDate(d);
+                  if (!d) setDeadlineTime('');
+                }}
+                clearLabel="Effacer l'échéance"
+              >
+                <input
+                  type="time"
+                  aria-label="Heure de l'échéance (facultatif)"
+                  value={deadlineTime}
+                  onChange={(e) => setDeadlineTime(e.target.value)}
+                />
+              </OptionalDate>
+            </Field>
+          )}
+        </div>
+
+        {/* Les autres réglages, repliés. */}
+        <details className="task-more" open={moreOpen} onToggle={(e) => setMoreOpen((e.currentTarget as HTMLDetailsElement).open)}>
+          <summary>Plus</summary>
           <Field label="Répéter" htmlFor={ids.repeat}>
             <select id={ids.repeat} value={repeat} onChange={(e) => setRepeat(e.target.value as Repeat)}>
               <option value="none">Jamais</option>
@@ -467,30 +530,6 @@ export function TaskSheet({ id, defaults, onClose }: { id?: ID; defaults?: Parti
 
           {!fixed && (
             <>
-              {/* Sans échéance (par défaut), le planificateur en déduit une de la priorité et
-                  replace la tâche à chaque recalcul tant qu'elle n'est pas cochée. */}
-              {repeat === 'none' && (
-                <Field label="Échéance" htmlFor={ids.deadline}>
-                  <OptionalDate
-                    id={ids.deadline}
-                    label="Échéance"
-                    value={deadlineDate}
-                    onChange={(d) => {
-                      setDeadlineDate(d);
-                      if (!d) setDeadlineTime('');
-                    }}
-                    clearLabel="Effacer l'échéance"
-                  >
-                    <input
-                      type="time"
-                      aria-label="Heure de l'échéance (facultatif)"
-                      value={deadlineTime}
-                      onChange={(e) => setDeadlineTime(e.target.value)}
-                    />
-                  </OptionalDate>
-                </Field>
-              )}
-
               <Field label="Horaires" htmlFor={ids.window}>
                 <select id={ids.window} value={windowId} onChange={(e) => setWindowId(e.target.value)}>
                   <option value="">Par défaut ({defaultWindowName})</option>
@@ -508,39 +547,8 @@ export function TaskSheet({ id, defaults, onClose }: { id?: ID; defaults?: Parti
                 </Field>
               )}
 
-              <Field label="Après" htmlFor={ids.deps}>
-                {dependsOn
-                  .map((d) => byId.get(d))
-                  .filter((t): t is Task => Boolean(t))
-                  .map((t) => (
-                    <button
-                      key={t.id}
-                      type="button"
-                      className="chip"
-                      aria-label={`Retirer « ${t.title} »`}
-                      onClick={() => setDependsOn(dependsOn.filter((x) => x !== t.id))}
-                      style={{ maxWidth: 200 }}
-                    >
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title}</span>
-                      <IconX size={14} />
-                    </button>
-                  ))}
-                {candidates.length > 0 && (
-                  <select
-                    id={ids.deps}
-                    value=""
-                    onChange={(e) => e.target.value && setDependsOn([...dependsOn, e.target.value])}
-                    style={{ maxWidth: 180 }}
-                  >
-                    <option value="">{dependsOn.length ? 'Ajouter…' : 'Aucune'}</option>
-                    {candidates.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.title}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </Field>
+              <DependencyField label="Après" hint="À faire avant celle-ci" ids={dependsOn} byId={byId} onRemove={(x) => setDependsOn(dependsOn.filter((d) => d !== x))} onPick={() => setPicking('after')} />
+              <DependencyField label="Avant" hint="À faire après celle-ci" ids={before} byId={byId} onRemove={(x) => setBefore(before.filter((d) => d !== x))} onPick={() => setPicking('before')} />
 
               <Field label="Découpable" htmlFor={ids.split}>
                 <input
@@ -566,7 +574,19 @@ export function TaskSheet({ id, defaults, onClose }: { id?: ID; defaults?: Parti
               )}
             </>
           )}
-        </div>
+        </details>
+
+        {task && (
+          <p className="task-spent">
+            <span>Temps passé</span>
+            <b>{formatDuration(Math.floor(store.timeSpent(task.id) / 60_000))}</b>
+          </p>
+        )}
+        {info.length > 0 && (
+          <p className="subtitle" style={{ marginTop: 8 }}>
+            {info.join(' · ')}
+          </p>
+        )}
 
         <label htmlFor={ids.notes} className="sr-only">
           Notes
@@ -588,12 +608,6 @@ export function TaskSheet({ id, defaults, onClose }: { id?: ID; defaults?: Parti
             resize: 'vertical',
           }}
         />
-
-        {info.length > 0 && (
-          <p className="subtitle" style={{ marginTop: 12 }}>
-            {info.join(' · ')}
-          </p>
-        )}
 
         <div className="sheet__actions">
           <button type="submit" className="btn btn--primary btn--block" disabled={!title.trim() || !fixedValid} style={title.trim() && fixedValid ? undefined : { opacity: 0.5 }}>
@@ -634,6 +648,24 @@ export function TaskSheet({ id, defaults, onClose }: { id?: ID; defaults?: Parti
           )}
         </div>
       </form>
+
+      {picking && (
+        <Sheet title={picking === 'after' ? 'À faire avant celle-ci' : 'À faire après celle-ci'} onClose={() => setPicking(null)}>
+          <TaskPickList
+            picked={new Set(picking === 'after' ? dependsOn : before)}
+            exclude={new Set([...(id ? [id] : []), ...(picking === 'after' ? before : dependsOn)])}
+            onToggle={(t) => {
+              const [list, set] = picking === 'after' ? [dependsOn, setDependsOn] : [before, setBefore];
+              set(list.includes(t.id) ? list.filter((x) => x !== t.id) : [...list, t.id]);
+            }}
+          />
+          <div style={{ position: 'sticky', bottom: 0, background: 'var(--card)', paddingTop: 12, marginTop: 12 }}>
+            <button type="button" className="btn btn--primary btn--block" onClick={() => setPicking(null)}>
+              Terminé ({(picking === 'after' ? dependsOn : before).length})
+            </button>
+          </div>
+        </Sheet>
+      )}
     </Sheet>
   );
 }

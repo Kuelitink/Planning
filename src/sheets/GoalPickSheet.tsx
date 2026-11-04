@@ -24,13 +24,13 @@ const HOUR = 60 * MINUTE;
 /** Une échéance à moins de 3 jours s'affiche à la place du créneau prévu. */
 const SOON_MS = 3 * DAY;
 
-interface Meta {
+export interface Meta {
   text: string;
   late: boolean;
   deadline: boolean;
 }
 
-function metaFor(task: Task, index: PlanIndex, late: boolean, now: Date): Meta | undefined {
+export function metaFor(task: Task, index: PlanIndex, late: boolean, now: Date): Meta | undefined {
   if (task.deadline && (late || parseDeadline(task.deadline).getTime() - now.getTime() < SOON_MS)) {
     return { text: shortDeadline(task.deadline, now), late, deadline: true };
   }
@@ -38,7 +38,7 @@ function metaFor(task: Task, index: PlanIndex, late: boolean, now: Date): Meta |
   return planned ? { text: planned, late: false, deadline: false } : undefined;
 }
 
-function SearchIcon() {
+export function SearchIcon() {
   return (
     <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden="true">
       <circle cx="11" cy="11" r="7" />
@@ -47,7 +47,7 @@ function SearchIcon() {
   );
 }
 
-const rowStyle = (on: boolean) =>
+export const rowStyle = (on: boolean) =>
   ({
     width: '100%',
     minHeight: 56,
@@ -73,29 +73,19 @@ export function GoalPickSheet({
   at?: Date;
   onClose: () => void;
 }) {
-  const { tasks, projects, goals, plan, addTask, pickTask, unpickTask } = useStore();
+  const { projects, goals, addTask, pickTask, unpickTask } = useStore();
   const { openSheet } = useNav();
-  const index = usePlanIndex();
-  const searchId = useId();
-  const [query, setQuery] = useState('');
   const now = new Date();
 
   const picked = new Set(pickedTaskIds(goals, period, periodStart));
-  const projectOf = (id?: string) => (id ? projects.find((p) => p.id === id) : undefined);
-  const urgent = useMemo(() => byUrgency(tasks, plan, new Date()), [tasks, plan]);
-
-  const q = query.trim();
-  const shown = q ? urgent.filter((t) => matchesQuery(t.title, q) || matchesQuery(projectOf(t.projectId)?.name ?? '', q)) : urgent;
-  const canCreate = q !== '' && !tasks.some((t) => fold(t.title.trim()) === fold(q));
 
   const toggle = (task: Task) =>
     picked.has(task.id) ? unpickTask(task.id, period, periodStart) : pickTask(task.id, period, periodStart);
 
-  const create = () => {
+  const create = (title: string) => {
     const first = projects.filter((p) => !p.archived).sort((a, b) => a.order - b.order)[0];
-    const task = addTask({ title: q, projectId: first?.id });
+    const task = addTask({ title, projectId: first?.id });
     pickTask(task.id, period, periodStart);
-    setQuery('');
   };
 
   return (
@@ -126,88 +116,7 @@ export function GoalPickSheet({
         </div>
       )}
 
-      <div style={{ position: 'sticky', top: -8, zIndex: 1, background: 'var(--card)', padding: '8px 0 12px' }}>
-        <label htmlFor={searchId} className="sr-only">
-          Rechercher une tâche
-        </label>
-        <span style={{ position: 'absolute', left: 14, top: 8 + 16, color: 'var(--muted)', display: 'inline-flex' }}>
-          <SearchIcon />
-        </span>
-        <input
-          id={searchId}
-          type="search"
-          className="text-input"
-          placeholder="Rechercher une tâche…"
-          value={query}
-          enterKeyHint="search"
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && canCreate && shown.length === 0) create();
-          }}
-          style={{ paddingLeft: 44, border: 'none', background: 'var(--bg)' }}
-        />
-      </div>
-
-      {canCreate && (
-        <button type="button" onClick={create} style={{ ...rowStyle(false), fontWeight: 600 }}>
-          <span style={{ width: 24, display: 'inline-flex', justifyContent: 'center' }}>
-            <IconPlus size={18} />
-          </span>
-          <span style={{ flex: 1, minWidth: 0, fontSize: 16, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            Créer « {q} »
-          </span>
-        </button>
-      )}
-
-      {shown.length > 0 && <p className="section-label" style={{ marginTop: canCreate ? 16 : 4 }}>{q ? 'Résultats' : 'Les plus urgentes'}</p>}
-
-      <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
-        {shown.map((t) => {
-          const on = picked.has(t.id);
-          const late = isLate(t, plan, now);
-          const meta = metaFor(t, index, late, now);
-          const project = projectOf(t.projectId);
-          return (
-            <li key={t.id}>
-              <button type="button" aria-pressed={on} onClick={() => toggle(t)} style={rowStyle(on)}>
-                <span
-                  aria-hidden="true"
-                  style={{ width: 12, height: 12, flex: 'none', borderRadius: 3, border: `2px solid ${PRIORITY_COLOR[t.priority]}` }}
-                />
-                <span style={{ flex: 1, minWidth: 0, fontSize: 16, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {t.title}
-                </span>
-                {meta && (
-                  <span
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 4,
-                      fontSize: 13,
-                      whiteSpace: 'nowrap',
-                      color: meta.late ? 'var(--danger)' : 'var(--muted)',
-                      fontWeight: meta.late ? 600 : 400,
-                    }}
-                  >
-                    {meta.deadline && <IconFlag size={12} />}
-                    {meta.text}
-                  </span>
-                )}
-                {project && <Dot color={project.color} />}
-                <span aria-hidden="true" style={{ width: 20, flex: 'none', display: 'inline-flex', justifyContent: 'center' }}>
-                  {on && <IconCheck size={18} />}
-                </span>
-              </button>
-            </li>
-          );
-        })}
-      </ul>
-
-      {shown.length === 0 && !canCreate && (
-        <p className="empty" style={{ padding: '24px 8px' }}>
-          {q ? 'Aucune tâche trouvée.' : 'Aucune tâche à faire. Tape un titre pour en créer une.'}
-        </p>
-      )}
+      <TaskPickList picked={picked} onToggle={toggle} onCreate={create} />
 
       <div style={{ position: 'sticky', bottom: 0, background: 'var(--card)', paddingTop: 12, marginTop: 12 }}>
         <button type="button" className="btn btn--primary btn--block" onClick={onClose}>
@@ -215,5 +124,125 @@ export function GoalPickSheet({
         </button>
       </div>
     </Sheet>
+  );
+}
+
+/**
+ * Recherche et liste de tâches à faire (les plus urgentes d'abord), chacune cochable :
+ * checklist d'une période, dépendances d'une tâche…
+ */
+export function TaskPickList({
+  picked,
+  onToggle,
+  onCreate,
+  exclude,
+}: {
+  picked: Set<string>;
+  onToggle: (task: Task) => void;
+  /** Absent : pas de « Créer « … » ». */
+  onCreate?: (title: string) => void;
+  exclude?: Set<string>;
+}) {
+  const { tasks, projects, plan } = useStore();
+  const index = usePlanIndex();
+  const searchId = useId();
+  const [query, setQuery] = useState('');
+  const now = new Date();
+  const projectOf = (id?: string) => (id ? projects.find((p) => p.id === id) : undefined);
+  const urgent = useMemo(() => byUrgency(tasks, plan, new Date()).filter((t) => !exclude?.has(t.id)), [tasks, plan, exclude]);
+
+  const q = query.trim();
+  const shown = q ? urgent.filter((t) => matchesQuery(t.title, q) || matchesQuery(projectOf(t.projectId)?.name ?? '', q)) : urgent;
+  const canCreate = Boolean(onCreate) && q !== '' && !tasks.some((t) => fold(t.title.trim()) === fold(q));
+
+  return (
+    <>
+        <div style={{ position: 'sticky', top: -8, zIndex: 1, background: 'var(--card)', padding: '8px 0 12px' }}>
+          <label htmlFor={searchId} className="sr-only">
+            Rechercher une tâche
+          </label>
+          <span style={{ position: 'absolute', left: 14, top: 8 + 16, color: 'var(--muted)', display: 'inline-flex' }}>
+            <SearchIcon />
+          </span>
+          <input
+            id={searchId}
+            type="search"
+            className="text-input"
+            placeholder="Rechercher une tâche…"
+            value={query}
+            enterKeyHint="search"
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && canCreate && shown.length === 0) {
+                onCreate?.(q);
+                setQuery('');
+              }
+            }}
+            style={{ paddingLeft: 44, border: 'none', background: 'var(--bg)' }}
+          />
+        </div>
+
+        {canCreate && (
+          <button type="button" onClick={() => { onCreate?.(q); setQuery(''); }} style={{ ...rowStyle(false), fontWeight: 600 }}>
+            <span style={{ width: 24, display: 'inline-flex', justifyContent: 'center' }}>
+              <IconPlus size={18} />
+            </span>
+            <span style={{ flex: 1, minWidth: 0, fontSize: 16, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              Créer « {q} »
+            </span>
+          </button>
+        )}
+
+        {shown.length > 0 && <p className="section-label" style={{ marginTop: canCreate ? 16 : 4 }}>{q ? 'Résultats' : 'Les plus urgentes'}</p>}
+
+        <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {shown.map((t) => {
+            const on = picked.has(t.id);
+            const late = isLate(t, plan, now);
+            const meta = metaFor(t, index, late, now);
+            const project = projectOf(t.projectId);
+            return (
+              <li key={t.id}>
+                <button type="button" aria-pressed={on} onClick={() => onToggle(t)} style={rowStyle(on)}>
+                  <span
+                    aria-hidden="true"
+                    style={{ width: 12, height: 12, flex: 'none', borderRadius: 3, border: `2px solid ${PRIORITY_COLOR[t.priority]}` }}
+                  />
+                  <span style={{ flex: 1, minWidth: 0, fontSize: 16, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {t.title}
+                  </span>
+                  {meta && (
+                    <span
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        fontSize: 13,
+                        whiteSpace: 'nowrap',
+                        color: meta.late ? 'var(--danger)' : 'var(--muted)',
+                        fontWeight: meta.late ? 600 : 400,
+                      }}
+                    >
+                      {meta.deadline && <IconFlag size={12} />}
+                      {meta.text}
+                    </span>
+                  )}
+                  {project && <Dot color={project.color} />}
+                  <span aria-hidden="true" style={{ width: 20, flex: 'none', display: 'inline-flex', justifyContent: 'center' }}>
+                    {on && <IconCheck size={18} />}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+
+        {shown.length === 0 && !canCreate && (
+          <p className="empty" style={{ padding: '24px 8px' }}>
+            {q ? 'Aucune tâche trouvée.' : 'Aucune tâche à faire. Tape un titre pour en créer une.'}
+          </p>
+        )}
+
+    </>
   );
 }
