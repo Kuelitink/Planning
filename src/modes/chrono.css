@@ -30,9 +30,12 @@
   border: var(--stroke);
   border-radius: 22px;
   background: var(--card);
+  color: var(--ink);
   display: flex;
   flex-direction: column;
+  align-items: stretch;
   gap: 6px;
+  text-align: left;
 }
 
 .chrono-card__title {

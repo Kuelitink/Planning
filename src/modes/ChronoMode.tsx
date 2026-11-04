@@ -186,7 +186,7 @@ export function ChronoMode() {
   };
 
   const card = (
-    <div className="chrono-card">
+    <button type="button" className="chrono-card" onClick={() => setSwitching(true)} aria-label="Changer de tâche">
       <span className="chrono-card__title">
         {task && <Dot color={color} />}
         <span>{task ? task.title : active ? 'Sans tâche' : 'Choisis une tâche'}</span>
@@ -197,7 +197,7 @@ export function ChronoMode() {
           <b>{formatDuration(spentMin)}</b>
         </span>
       )}
-    </div>
+    </button>
   );
 
   const switchButton = (
