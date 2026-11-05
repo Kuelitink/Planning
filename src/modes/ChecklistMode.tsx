@@ -20,7 +20,8 @@ import { fold, matchesQuery, pickedTaskIds } from '../state/urgency';
 import { Fab, Header, useNow } from '../ui/kit';
 import { IconChevronLeft, IconChevronRight, IconPlus } from '../ui/icons';
 import { formatDayMonth, formatMonth, formatRelativeDay, isoWeek } from '../ui/format';
-import { Collapsible, TaskRow } from './TaskRow';
+import { Collapsible, TaskRow, shortDeadline } from './TaskRow';
+import { parseDeadline } from '../core/scheduler';
 import { INDENT_PX, SortableTaskList } from './SortableTasks';
 import './checklist.css';
 
@@ -126,10 +127,32 @@ export function ChecklistMode() {
   const topCount = rows.filter((r) => r.depth === 0).length;
   const doneCount = doneRows.filter((r) => r.depth === 0).length;
 
-  /** Planifiées aujourd'hui sans être dans la checklist du jour. */
-  const alsoToday = useMemo(() => {
+  /**
+   * Checklist d'aujourd'hui : tâches en retard ou à rendre d'ici demain soir (échéance, ou
+   * occurrence d'une tâche récurrente), ou que le planning ne tient pas avant leur échéance.
+   */
+  const dueSoon = useMemo(() => {
     if (period !== 'day' || !isCurrent) return [];
     const inList = new Set(rows.map((r) => r.id));
+    const limit = addDays(startOfDay(now), 2).getTime();
+    const atRisk = new Set(plan.atRisk.map((r) => r.taskId));
+    const out: { task: Task; due: string; late: boolean }[] = [];
+    for (const task of tasks) {
+      if (task.status !== 'todo' || inList.has(task.id) || (task.parentId && inList.has(task.parentId))) continue;
+      const due = task.recurrence && task.occurrence ? task.occurrence : task.deadline;
+      if (!due) continue;
+      const dueMs = parseDeadline(due).getTime();
+      if (dueMs > limit && !atRisk.has(task.id)) continue;
+      out.push({ task, due, late: dueMs <= now.getTime() || atRisk.has(task.id) });
+    }
+    return out.sort((a, b) => parseDeadline(a.due).getTime() - parseDeadline(b.due).getTime());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [period, isCurrent, rows, plan, tasks, toISODate(now)]);
+
+  /** Planifiées aujourd'hui sans être dans la checklist du jour (ni déjà ci-dessus). */
+  const alsoToday = useMemo(() => {
+    if (period !== 'day' || !isCurrent) return [];
+    const inList = new Set([...rows.map((r) => r.id), ...dueSoon.map((d) => d.task.id)]);
     const dp = dayPlan(plan, tasks, events, startOfDay(now), { windows, settings });
     const seen = new Set<ID>();
     const out: { task: Task; start: Date }[] = [];
@@ -142,7 +165,7 @@ export function ChecklistMode() {
     }
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [period, isCurrent, rows, plan, tasks, events, windows, settings, byId, toISODate(now)]);
+  }, [period, isCurrent, rows, dueSoon, plan, tasks, events, windows, settings, byId, toISODate(now)]);
 
   const setPeriod = (p: GoalPeriod) => {
     setPeriodState(p);
@@ -223,7 +246,15 @@ export function ChecklistMode() {
         </p>
       )}
 
-      {/* Les tâches planifiées aujourd'hui, puis celles ajoutées à la checklist. */}
+      {/* En retard ou bientôt dues, puis planifiées aujourd'hui, puis ajoutées à la checklist. */}
+      {dueSoon.length > 0 && (
+        <ul className="stack cl-planned">
+          {dueSoon.map(({ task, due, late }) => (
+            <TaskRow key={task.id} task={task} meta={late ? undefined : shortDeadline(due, now)} late={late} />
+          ))}
+        </ul>
+      )}
+
       {alsoToday.length > 0 && (
         <ul className="stack cl-planned">
           {alsoToday.map(({ task, start }) => (
