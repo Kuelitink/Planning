@@ -129,16 +129,25 @@ export function ChecklistMode() {
 
   /**
    * Checklist d'aujourd'hui : tâches en retard ou à rendre d'ici demain soir (échéance, ou
-   * occurrence d'une tâche récurrente), ou que le planning ne tient pas avant leur échéance.
+   * occurrence d'une tâche récurrente), ou que le planning ne tient pas avant leur échéance,
+   * à condition que le planning les place aujourd'hui.
    */
   const dueSoon = useMemo(() => {
     if (period !== 'day' || !isCurrent) return [];
     const inList = new Set(rows.map((r) => r.id));
+    // Seulement ce que le planning place aujourd'hui : une tâche qui ne peut pas être faite
+    // aujourd'hui n'apparaît que si on l'ajoute soi-même.
+    const today = new Set(
+      dayPlan(plan, tasks, events, startOfDay(now), { windows, settings })
+        .items.filter((i) => i.kind === 'task')
+        .map((i) => (i.kind === 'task' ? i.taskId : '')),
+    );
     const limit = addDays(startOfDay(now), 2).getTime();
     const atRisk = new Set(plan.atRisk.map((r) => r.taskId));
     const out: { task: Task; due: string; late: boolean }[] = [];
     for (const task of tasks) {
       if (task.status !== 'todo' || inList.has(task.id) || (task.parentId && inList.has(task.parentId))) continue;
+      if (!today.has(task.id)) continue;
       const due = task.recurrence && task.occurrence ? task.occurrence : task.deadline;
       if (!due) continue;
       const dueMs = parseDeadline(due).getTime();
@@ -147,7 +156,7 @@ export function ChecklistMode() {
     }
     return out.sort((a, b) => parseDeadline(a.due).getTime() - parseDeadline(b.due).getTime());
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [period, isCurrent, rows, plan, tasks, toISODate(now)]);
+  }, [period, isCurrent, rows, plan, tasks, events, windows, settings, toISODate(now)]);
 
   /** Planifiées aujourd'hui sans être dans la checklist du jour (ni déjà ci-dessus). */
   const alsoToday = useMemo(() => {
