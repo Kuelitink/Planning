@@ -22,6 +22,7 @@ import { IconChevronLeft, IconChevronRight, IconPlus } from '../ui/icons';
 import { formatDayMonth, formatMonth, formatRelativeDay, isoWeek } from '../ui/format';
 import { Collapsible, TaskRow, shortDeadline } from './TaskRow';
 import { parseDeadline } from '../core/scheduler';
+import { rulesForTask, windowAvailability } from '../core/windows';
 import { INDENT_PX, SortableTaskList } from './SortableTasks';
 import './checklist.css';
 
@@ -130,16 +131,22 @@ export function ChecklistMode() {
   /**
    * Checklist d'aujourd'hui : tâches en retard ou à rendre d'ici demain soir (échéance, ou
    * occurrence d'une tâche récurrente), ou que le planning ne tient pas avant leur échéance.
-   * Pas celles dont « Pas avant » tombe après aujourd'hui.
+   * Pas celles dont « Pas avant » tombe après aujourd'hui, ni celles dont les horaires sont
+   * fermés aujourd'hui (jour hors de leurs plages, période spéciale…).
    */
   const dueSoon = useMemo(() => {
     if (period !== 'day' || !isCurrent) return [];
     const inList = new Set(rows.map((r) => r.id));
+    const dayStart = startOfDay(now).getTime();
+    const dayEnd = addDays(startOfDay(now), 1).getTime();
     const limit = addDays(startOfDay(now), 2).getTime();
     const atRisk = new Set(plan.atRisk.map((r) => r.taskId));
     const out: { task: Task; due: string; late: boolean }[] = [];
     for (const task of tasks) {
       if (task.status !== 'todo' || inList.has(task.id) || (task.parentId && inList.has(task.parentId))) continue;
+      // Horaires de la tâche fermés aujourd'hui : elle n'est pas à faire aujourd'hui.
+      const { window, rules } = rulesForTask(task, windows, projects, settings);
+      if (!windowAvailability(window, rules, dayStart, dayEnd).length) continue;
       // « Pas avant » après aujourd'hui (on attend une réponse…) : inutile d'y penser aujourd'hui.
       if (task.earliestStart && parseDateTime(task.earliestStart).getTime() >= addDays(startOfDay(now), 1).getTime()) continue;
       const due = task.recurrence && task.occurrence ? task.occurrence : task.deadline;
@@ -150,7 +157,7 @@ export function ChecklistMode() {
     }
     return out.sort((a, b) => parseDeadline(a.due).getTime() - parseDeadline(b.due).getTime());
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [period, isCurrent, rows, plan, tasks, toISODate(now)]);
+  }, [period, isCurrent, rows, plan, tasks, windows, projects, settings, toISODate(now)]);
 
   /** Planifiées aujourd'hui sans être dans la checklist du jour (ni déjà ci-dessus). */
   const alsoToday = useMemo(() => {
