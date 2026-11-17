@@ -129,10 +129,12 @@ export function ChecklistMode() {
   const topCount = rows.filter((r) => r.depth === 0).length;
   const doneCount = doneRows.filter((r) => r.depth === 0).length;
 
-  /** Événements de la période (récurrences dépliées), masqués ou non. */
+  /** Événements ponctuels de la période, masqués ou non. */
   const periodEvents = useMemo(() => {
     const from = parseISODate(periodStart);
-    const occ = expandEvents(events, from, periodEnd(period, periodStart));
+    // Les événements qui reviennent (récurrents) ne sont pas affichés : ils encombreraient la liste.
+    const once = events.filter((e) => !e.recurrence);
+    const occ = expandEvents(once, from, periodEnd(period, periodStart));
     const byEvent = new Map(events.map((e) => [e.id, e]));
     return occ.map((o) => ({ ...o, key: o.start.toISOString(), hidden: Boolean(byEvent.get(o.eventId)?.checklistHidden?.includes(o.start.toISOString())) }));
   }, [events, period, periodStart]);
