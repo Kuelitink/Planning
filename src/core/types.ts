@@ -141,6 +141,8 @@ export interface CalendarEvent extends Entity {
   /** Les événements « journée entière » ne bloquent pas de temps. */
   allDay?: boolean;
   recurrence?: Recurrence;
+  /** Occurrences (début ISO) masquées dans les checklists, en les cochant. */
+  checklistHidden?: ISODateTime[];
 }
 
 export type GoalPeriod = 'day' | 'week' | 'month';

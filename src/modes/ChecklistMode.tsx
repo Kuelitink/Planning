@@ -18,10 +18,11 @@ import { useStore } from '../state/store';
 import { useNav } from '../state/nav';
 import { fold, matchesQuery, pickedTaskIds } from '../state/urgency';
 import { Fab, Header, useNow } from '../ui/kit';
-import { IconChevronLeft, IconChevronRight, IconPlus } from '../ui/icons';
+import { IconCalendar, IconChevronLeft, IconChevronRight, IconPlus } from '../ui/icons';
 import { formatDayMonth, formatMonth, formatRelativeDay, isoWeek } from '../ui/format';
 import { Collapsible, TaskRow, shortDeadline } from './TaskRow';
 import { parseDeadline } from '../core/scheduler';
+import { expandEvents } from '../core/events';
 import { rulesForTask, windowAvailability } from '../core/windows';
 import { INDENT_PX, SortableTaskList } from './SortableTasks';
 import './checklist.css';
@@ -91,7 +92,7 @@ export function PeriodPicker({ value, onChange }: { value: GoalPeriod; onChange:
 const SUGGESTIONS = 3;
 
 export function ChecklistMode() {
-  const { goals, tasks, projects, settings, plan, events, windows, addTask, pickTask, unpickTask, applyChecklist } = useStore();
+  const { goals, tasks, projects, settings, plan, events, windows, addTask, pickTask, unpickTask, applyChecklist, saveEvent } = useStore();
   const { openSheet, showToast } = useNav();
   const [period, setPeriodState] = useState<GoalPeriod>(readPeriod);
   const [anchor, setAnchor] = useState(() => new Date());
@@ -127,6 +128,22 @@ export function ChecklistMode() {
 
   const topCount = rows.filter((r) => r.depth === 0).length;
   const doneCount = doneRows.filter((r) => r.depth === 0).length;
+
+  /** Événements de la période (récurrences dépliées), masqués ou non. */
+  const periodEvents = useMemo(() => {
+    const from = parseISODate(periodStart);
+    const occ = expandEvents(events, from, periodEnd(period, periodStart));
+    const byEvent = new Map(events.map((e) => [e.id, e]));
+    return occ.map((o) => ({ ...o, key: o.start.toISOString(), hidden: Boolean(byEvent.get(o.eventId)?.checklistHidden?.includes(o.start.toISOString())) }));
+  }, [events, period, periodStart]);
+
+  /** Cocher un événement le masque ; le toucher dans « Masqués » le remet. */
+  const setEventHidden = (eventId: ID, key: string, hide: boolean) => {
+    const ev = events.find((e) => e.id === eventId);
+    if (!ev) return;
+    const rest = (ev.checklistHidden ?? []).filter((k) => k !== key);
+    saveEvent({ ...ev, checklistHidden: hide ? [...rest, key] : rest });
+  };
 
   /**
    * Checklist d'aujourd'hui : tâches en retard ou à rendre d'ici demain soir (échéance, ou
@@ -256,6 +273,13 @@ export function ChecklistMode() {
         </p>
       )}
 
+      <EventChips
+        events={periodEvents}
+        period={period}
+        onHide={(e, hide) => setEventHidden(e.eventId, e.key, hide)}
+        onOpen={(id) => openSheet({ kind: 'event', id })}
+      />
+
       {/* En retard ou bientôt dues, puis planifiées aujourd'hui, puis ajoutées à la checklist. */}
       {dueSoon.length > 0 && (
         <ul className="stack cl-planned">
@@ -311,5 +335,77 @@ export function ChecklistMode() {
 
       <Fab label="Ajouter des tâches existantes" onClick={openPicker} />
     </>
+  );
+}
+
+interface PeriodEvent {
+  eventId: ID;
+  key: string;
+  title: string;
+  start: Date;
+  end: Date;
+  allDay: boolean;
+  hidden: boolean;
+}
+
+const WEEKDAY = new Intl.DateTimeFormat('fr-FR', { weekday: 'short' });
+
+/** « 09:00 » (jour), « lun. 09:00 » (semaine), « 5 nov. 09:00 » (mois) ; « journée » sans heure. */
+function eventWhen(e: PeriodEvent, period: GoalPeriod): string {
+  const time = e.allDay ? 'journée' : formatHM(e.start);
+  if (period === 'day') return time;
+  if (period === 'week') return `${WEEKDAY.format(e.start)} ${time}`;
+  return `${formatDayMonth(e.start)} ${time}`;
+}
+
+/**
+ * Événements de la période, en puces pointillées violettes à la largeur des tâches. La case
+ * ronde les masque (ils passent dans « Masqués »), les tâches ont une case carrée.
+ */
+function EventChips({
+  events,
+  period,
+  onHide,
+  onOpen,
+}: {
+  events: PeriodEvent[];
+  period: GoalPeriod;
+  onHide: (e: PeriodEvent, hide: boolean) => void;
+  onOpen: (id: ID) => void;
+}) {
+  const [showHidden, setShowHidden] = useState(false);
+  const shown = events.filter((e) => !e.hidden);
+  const hidden = events.filter((e) => e.hidden);
+  if (!events.length) return null;
+  return (
+    <div className="cl-events">
+      {shown.map((e) => (
+        <div key={e.key + e.eventId} className="cl-event">
+          <button type="button" className="cl-event__check" aria-label={`Masquer « ${e.title} »`} onClick={() => onHide(e, true)} />
+          <button type="button" className="cl-event__main" onClick={() => onOpen(e.eventId)}>
+            <IconCalendar size={16} />
+            <span className="cl-event__text">
+              {eventWhen(e, period)} · {e.title}
+            </span>
+          </button>
+        </div>
+      ))}
+      {hidden.length > 0 && (
+        <>
+          <button type="button" className="link-btn" aria-expanded={showHidden} onClick={() => setShowHidden(!showHidden)}>
+            {showHidden ? '▾' : '▸'} Événements masqués ({hidden.length})
+          </button>
+          {showHidden &&
+            hidden.map((e) => (
+              <button key={e.key + e.eventId} type="button" className="cl-event-hidden" onClick={() => onHide(e, false)}>
+                <IconCalendar size={14} />
+                <span>
+                  {eventWhen(e, period)} · {e.title}
+                </span>
+              </button>
+            ))}
+        </>
+      )}
+    </div>
   );
 }

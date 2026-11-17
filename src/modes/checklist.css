@@ -215,3 +215,76 @@
   font-weight: 600;
   outline: none;
 }
+
+/* Événements : puces pointillées violettes, à la largeur des tâches (les tâches ont une case carrée). */
+.cl-events {
+  --ev: #6b3fa0;
+  margin: 0 0 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cl-event {
+  min-height: 48px;
+  padding: 0 14px;
+  border: 1.5px dashed var(--ev);
+  border-radius: 999px;
+  background: #f3ebfb;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.cl-event__check {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  padding: 0;
+  border: 2px solid var(--ev);
+  border-radius: 50%;
+  background: var(--card);
+}
+
+.cl-event__check:active {
+  background: var(--ev);
+}
+
+.cl-event__main {
+  flex: 1;
+  min-width: 0;
+  min-height: 48px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ev);
+  text-align: left;
+}
+
+.cl-event__text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.cl-event-hidden {
+  min-height: 40px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  text-align: left;
+  font-size: 14px;
+  text-decoration: line-through;
+}
